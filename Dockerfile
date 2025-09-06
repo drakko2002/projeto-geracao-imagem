@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Define variável para o token Hugging Face (será passada no docker run)
-ENV HUGGINGFACE_HUB_TOKEN="INSERT_TOKEN_HERE"
+ENV HUGGINGFACE_HUB_TOKEN=""
 
 # Comando padrão: roda o app
 CMD ["python", "app.py"]
