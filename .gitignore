@@ -1,0 +1,12 @@
+local.env
+bin/
+compiler_compat/
+conda-meta/
+etc/
+include/
+lib/
+man/
+models/
+opt/
+share/
+ssl/
