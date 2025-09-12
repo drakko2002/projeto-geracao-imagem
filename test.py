@@ -1,12 +1,10 @@
-import torch
-from diffusers import StableDiffusionPipeline
+from diffusers import DiffusionPipeline
+import os
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "models/stable-diffusion-2-1",
-    torch_dtype=torch.float16
-).to("cuda")
+token = os.getenv("HUGGINGFACE_HUB_TOKEN", None)
+if token is None:
+    raise ValueError("HUGGINGFACE_HUB_TOKEN environment variable not set")
+pipe = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1")
 
-pipe.enable_xformers_memory_efficient_attention()
-
-image = pipe("um gato astronauta explorando marte").images[0]
-image.save("gato_marte.png")
+prompt = "Astronaut in a jungle, cold color palette, muted colors, detailed, 8k"
+image = pipe(prompt).images[0]
