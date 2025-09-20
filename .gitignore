@@ -1,15 +1,31 @@
+# Tokens e configurações sensíveis
 local.env
+.env
+
+# Python
 bin/
+venv/
+
+# Dependências e cache
 compiler_compat/
 conda-meta/
 etc/
 include/
 lib/
 man/
-models/
 opt/
 share/
 ssl/
+
+# Modelos e saídas
 model/
+models/
 outputs/
-venv/
+*.png
+*.jpg
+*.jpeg
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
