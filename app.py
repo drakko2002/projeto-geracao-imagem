@@ -2,9 +2,20 @@ import torch
 from diffusers import StableDiffusionPipeline
 import os
 
+# Carregar variáveis do arquivo .env
+def load_env():
+    if os.path.exists('.env'):
+        with open('.env', 'r') as f:
+            for line in f:
+                if line.strip() and not line.startswith('#'):
+                    key, value = line.strip().split('=', 1)
+                    os.environ[key] = value
+
+load_env()
+
 token = os.getenv("HUGGINGFACE_HUB_TOKEN", None)
 if token is None:
-    raise ValueError("HUGGINGFACE_HUB_TOKEN environment variable not set")
+    raise ValueError("HUGGINGFACE_HUB_TOKEN environment variable not set. Configure o arquivo .env")
 dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
 model_path = "./model"
