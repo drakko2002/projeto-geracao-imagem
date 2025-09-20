@@ -10,3 +10,6 @@ models/
 opt/
 share/
 ssl/
+model/
+outputs/
+venv/
