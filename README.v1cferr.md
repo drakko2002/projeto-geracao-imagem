@@ -9,7 +9,7 @@ Projeto de faculdade para geração de imagens offline via IA (Stable Diffusion)
 - ✅ Stable Diffusion 2.1 baixado e configurado
 - ✅ Ambiente virtual Python isolado
 
-## � Configuração do Token HuggingFace
+## 🔑 Configuração do Token HuggingFace
 
 Para baixar e usar o modelo Stable Diffusion, você precisa de um token do HuggingFace:
 
@@ -31,7 +31,7 @@ nano .env
 HUGGINGFACE_HUB_TOKEN=seu_token_aqui
 ```
 
-## �🚀 Instalação e Uso
+## 🚀 Instalação e Uso
 
 ### Pré-requisitos
 
@@ -39,15 +39,25 @@ HUGGINGFACE_HUB_TOKEN=seu_token_aqui
 - GPU NVIDIA com drivers funcionando
 - Python 3.10+ instalado
 
-### Setup Rápido
+### Setup Rápido (funciona desde o zero)
 
 ```bash
-# 1. Ativar ambiente virtual
-source venv/bin/activate
+# 1. Configurar token (primeira vez apenas)
+cp .env.example .env
+nano .env  # Adicione seu token do HuggingFace
 
-# 2. Rodar o projeto 
+# 2. Rodar (faz tudo automaticamente)
+chmod +x run.sh
 ./run.sh
 ```
+
+**O script `run.sh` faz automaticamente:**
+
+- ✅ Verifica Python
+- ✅ Cria ambiente virtual  
+- ✅ Instala dependências
+- ✅ Baixa modelo (primeira vez)
+- ✅ Gera imagem
 
 ### Setup Completo (primeira vez)
 
