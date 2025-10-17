@@ -81,13 +81,16 @@ torch.manual_seed(opt.manualSeed)
 
 cudnn.benchmark = True
 
-# Lógica de detecção de dispositivo corrigida
-# device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
-
-if opt.accel and torch.accelerator.is_available():
+# Lógica de detecção de dispositivo
+if torch.cuda.is_available() and opt.ngpu > 0:
+    device = torch.device("cuda:0")
+    print(f"✓ GPU detectada! Usando: {torch.cuda.get_device_name(0)}")
+elif opt.accel and hasattr(torch, "accelerator") and torch.accelerator.is_available():
     device = torch.accelerator.current_accelerator()
+    print(f"✓ Usando acelerador: {device}")
 else:
     device = torch.device("cpu")
+    print("⚠ GPU não detectada, usando CPU (será mais lento)")
 
 print(f"Using device: {device}")
 
@@ -241,9 +244,9 @@ with torch.no_grad():
 vutils.save_image(fake_image, "resultado_nao_treinado.png", normalize=True)
 
 print("[SUCESSO] Imagem 'resultado_nao_treinado.png' foi salva.")
-print("[INFO] Saindo do script antes de iniciar o treinamento.")
+print("[INFO] Iniciando treinamento...")
 
-sys.exit()  # Impede que o resto do código (o treinamento) seja executado
+# sys.exit()  # Comentado para permitir o treinamento
 
 if opt.netG != "":
     netG.load_state_dict(torch.load(opt.netG))
