@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul 2>&1
 REM ══════════════════════════════════════════════════════════════
 REM  INSTALADOR AUTOMÁTICO - 1 CLIQUE
 REM  Sistema de Geração de Imagens com GANs

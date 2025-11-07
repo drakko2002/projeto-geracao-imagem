@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul 2>&1
 REM ══════════════════════════════════════════════════════════════
 REM  Script de configuração rápida para Windows
 REM  Projeto: Sistema de Geração de Imagens com GANs

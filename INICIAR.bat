@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul 2>&1
 REM ══════════════════════════════════════════════════════════════
 REM  INICIALIZADOR PRINCIPAL - 1 CLIQUE PARA TUDO
 REM  Baixa modelos + Abre menu de geração
