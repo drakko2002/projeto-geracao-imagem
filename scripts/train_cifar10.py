@@ -40,7 +40,7 @@ print("Iniciando treinamento...")
 print("(Isso pode demorar alguns minutos ou horas dependendo do hardware)")
 print("=" * 70 + "\n")
 
-# Comando para executar o treinamento
+
 cmd = [
     sys.executable,
     "dcgan/main.py",
@@ -57,10 +57,9 @@ cmd = [
     "--outf",
     OUTPUT_DIR,
     "--ngpu",
-    "1",  # Ajuste se tiver mais GPUs
+    "1",
 ]
 
-# Se tiver CUDA disponível, use
 try:
     import torch
 

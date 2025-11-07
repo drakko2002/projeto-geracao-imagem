@@ -154,6 +154,20 @@ elif opt.dataset == "mnist":
     )
     nc = 1
 
+elif opt.dataset == "fashion-mnist":
+    dataset = dset.FashionMNIST(
+        root=opt.dataroot,
+        download=True,
+        transform=transforms.Compose(
+            [
+                transforms.Resize(opt.imageSize),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,)),
+            ]
+        ),
+    )
+    nc = 1
+
 elif opt.dataset == "fake":
     dataset = dset.FakeData(
         image_size=(3, opt.imageSize, opt.imageSize), transform=transforms.ToTensor()

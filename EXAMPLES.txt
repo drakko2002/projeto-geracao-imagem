@@ -1,0 +1,133 @@
+"""
+EXEMPLOS DE USO - Copie e cole estes comandos
+
+Este arquivo contém exemplos prontos para usar o sistema de treinamento.
+Copie e cole os comandos no terminal.
+"""
+
+# ============================================================================
+# INÍCIO RÁPIDO
+# ============================================================================
+
+# Ver datasets disponíveis
+python train.py --list-datasets
+
+# Ver modelos disponíveis
+python train.py --list-models
+
+# ============================================================================
+# EXEMPLOS BÁSICOS
+# ============================================================================
+
+# Exemplo 1: Teste rápido com MNIST (5 minutos)
+python train.py --dataset mnist --model dcgan --epochs 5
+
+# Exemplo 2: Treinamento básico Fashion-MNIST (15 minutos)
+python train.py --dataset fashion-mnist --model dcgan --epochs 25
+
+# Exemplo 3: Treinamento CIFAR-10 (1 hora)
+python train.py --dataset cifar10 --model dcgan --epochs 50
+
+# ============================================================================
+# ALTA QUALIDADE (mais demorado, melhores resultados)
+# ============================================================================
+
+# WGAN-GP com CIFAR-10 (melhor qualidade, ~3 horas)
+python train.py --dataset cifar10 --model wgan-gp --epochs 100
+
+# Fashion-MNIST com WGAN-GP
+python train.py --dataset fashion-mnist --model wgan-gp --epochs 100
+
+# ============================================================================
+# AJUSTANDO PARA SUA GPU
+# ============================================================================
+
+# GPU com pouca memória (4GB)
+python train.py --dataset cifar10 --model dcgan --batch-size 32
+
+# GPU potente (8GB+)
+python train.py --dataset cifar10 --model wgan-gp --batch-size 128 --img-size 128
+
+# Sem GPU (CPU - muito lento!)
+python train.py --dataset mnist --model dcgan --epochs 5 --batch-size 16
+
+# ============================================================================
+# ALTA RESOLUÇÃO
+# ============================================================================
+
+# Imagens 128x128 com mais filtros
+python train.py --dataset cifar10 --model dcgan --img-size 128 --ngf 128 --ndf 128
+
+# ============================================================================
+# DATASET CUSTOMIZADO
+# ============================================================================
+
+# Usar suas próprias imagens
+# 1. Crie: data/custom/categoria/
+# 2. Adicione suas imagens lá
+# 3. Execute:
+python train.py --dataset custom --model dcgan --epochs 100
+
+# ============================================================================
+# CELEBA (faces de celebridades)
+# ============================================================================
+
+# IMPORTANTE: Baixe primeiro de http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html
+# Extraia para: data/celeba/
+
+python train.py --dataset celeba --model dcgan --epochs 100 --img-size 128
+
+# ============================================================================
+# GERAR IMAGENS DE MODELO TREINADO
+# ============================================================================
+
+# Gerar 64 imagens
+python generate.py --checkpoint outputs/cifar10/dcgan_xxx/checkpoints/checkpoint_latest.pth --num-samples 64
+
+# Gerar 100 imagens em grid 10x10
+python generate.py --checkpoint outputs/mnist/dcgan_xxx/checkpoints/checkpoint_latest.pth --num-samples 100 --nrow 10
+
+# ============================================================================
+# CONFIGURAÇÕES PERSONALIZADAS
+# ============================================================================
+
+# Learning rate customizado
+python train.py --dataset cifar10 --model dcgan --epochs 50 --lr 0.0001
+
+# Vetor latente maior (mais variação)
+python train.py --dataset cifar10 --model dcgan --epochs 50 --nz 200
+
+# Mais filtros (melhor qualidade, mais lento)
+python train.py --dataset cifar10 --model dcgan --epochs 50 --ngf 128 --ndf 128
+
+# ============================================================================
+# COMBINAÇÕES RECOMENDADAS
+# ============================================================================
+
+# Melhor qualidade CIFAR-10
+python train.py --dataset cifar10 --model wgan-gp --epochs 200 --batch-size 64 --ngf 128 --ndf 128
+
+# Melhor qualidade Fashion-MNIST
+python train.py --dataset fashion-mnist --model wgan-gp --epochs 150 --batch-size 128
+
+# Prototipagem rápida
+python train.py --dataset mnist --model dcgan --epochs 10 --batch-size 128
+
+# ============================================================================
+# SCRIPT INTERATIVO (Linux/Mac)
+# ============================================================================
+
+chmod +x quickstart.sh
+./quickstart.sh
+
+# ============================================================================
+# COMPARAÇÃO DE MODELOS
+# ============================================================================
+
+# Treinar DCGAN
+python train.py --dataset cifar10 --model dcgan --epochs 50
+
+# Treinar WGAN-GP (para comparar)
+python train.py --dataset cifar10 --model wgan-gp --epochs 50
+
+# Compare os resultados em outputs/cifar10/
