@@ -1,277 +1,579 @@
-# 🎨 Projeto de Geração de Imagens com GANs
+# 🎨 Sistema de Treinamento de GANs
 
-Sistema completo e unificado para treinar **Generative Adversarial Networks (GANs)** com múltiplos datasets e arquiteturas diferentes. Desenvolvido para ser **fácil de usar**, **portátil** e **pronto para compartilhar**.
+Sistema completo e unificado para treinar **Generative Adversarial Networks (GANs)** com múltiplos datasets e arquiteturas. Desenvolvido para ser **fácil de usar**, **portátil** e **pronto para compartilhar**.
 
-## ✨ Características
-
-- 🚀 **Treinamento simplificado** em um único arquivo
-- 📦 **5 datasets suportados** (download automático incluído)
-- 🤖 **2 arquiteturas GAN** (DCGAN e WGAN-GP)
-- 💾 **Sistema de checkpoints** para retomar treinamento
-- 📊 **Visualização automática** de perdas e amostras
-- 🎯 **Configuração flexível** via CLI ou arquivos
-- 📝 **Logs detalhados** de todo o processo
-- ⚡ **Suporte para GPU** (CUDA) e CPU
-
-## 🎯 Início Rápido
-
-### 1. Instalação
+## ⚡ Início Ultra-Rápido
 
 ```bash
-# Clonar repositório
-git clone <seu-repositorio>
-cd projeto-geracao-imagem
-
-# Instalar dependências
+# 1. Instalar dependências
 pip install -r requirements.txt
-```
 
-### 2. Treinar seu primeiro modelo
+# 2. Usar menu interativo (recomendado!)
+./run.sh
 
-```bash
-# Treinar DCGAN com CIFAR-10 (download automático)
-python train.py --dataset cifar10 --model dcgan --epochs 50
-
-# Treinar WGAN-GP com Fashion-MNIST
-python train.py --dataset fashion-mnist --model wgan-gp --epochs 100
-
-# Treinar com MNIST (rápido para testes)
+# OU treinar direto via linha de comando
 python train.py --dataset mnist --model dcgan --epochs 25
 ```
 
-### 3. Gerar imagens
+---
+
+## 📋 Índice
+
+- [Características](#-características)
+- [Instalação](#-instalação)
+- [Como Usar](#-como-usar)
+  - [Menu Interativo](#1-menu-interativo-recomendado)
+  - [Linha de Comando](#2-linha-de-comando)
+  - [Gerar Imagens](#3-gerar-imagens)
+- [Datasets Disponíveis](#-datasets-disponíveis)
+- [Modelos GAN](#-modelos-gan)
+- [Exemplos Práticos](#-exemplos-práticos)
+- [Parâmetros Avançados](#️-parâmetros-avançados)
+- [Estrutura de Saída](#-estrutura-de-saída)
+- [Troubleshooting](#-troubleshooting)
+- [FAQ](#-faq)
+
+---
+
+## ✨ Características
+
+- 🚀 **Menu interativo** - Configure tudo sem digitar comandos
+- 📦 **5 datasets** - CIFAR-10, MNIST, Fashion-MNIST, CelebA, Custom
+- 🤖 **2 arquiteturas GAN** - DCGAN e WGAN-GP
+- 💾 **Checkpoints automáticos** - Retome treinamento a qualquer momento
+- 📊 **Visualização em tempo real** - Perdas e amostras geradas
+- ⚡ **Suporte GPU/CPU** - Detecta CUDA automaticamente
+- 🎯 **Download automático** - Datasets baixados automaticamente
+- 📝 **Logs detalhados** - Acompanhe todo o processo
+
+---
+
+## 📥 Instalação
 
 ```bash
-# Gerar imagens usando modelo treinado
-python generate.py --checkpoint outputs/cifar10/dcgan_xxx/checkpoints/checkpoint_latest.pth --num-samples 64
+# 1. Clonar repositório
+git clone https://github.com/seu-usuario/projeto-geracao-imagem.git
+cd projeto-geracao-imagem
+
+# 2. Instalar dependências
+pip install -r requirements.txt
+
+# 3. Dar permissão ao script (Linux/Mac)
+chmod +x run.sh
+
+# 4. Verificar instalação
+python train.py --list-datasets
 ```
 
-## 📦 Datasets Suportados
+### Requisitos
 
-| Dataset           | Descrição                | Download       | Imagens  |
-| ----------------- | ------------------------ | -------------- | -------- |
-| **CIFAR-10**      | 10 categorias coloridas  | ✅ Automático   | 60.000   |
-| **MNIST**         | Dígitos 0-9 em grayscale | ✅ Automático   | 70.000   |
-| **Fashion-MNIST** | Roupas e acessórios      | ✅ Automático   | 70.000   |
-| **CelebA**        | Faces de celebridades    | ⚠️ Manual       | ~200.000 |
-| **Custom**        | Suas próprias imagens    | 📁 Suas imagens | Variável |
+- Python 3.8+
+- PyTorch 2.0+
+- CUDA (opcional, mas recomendado para GPU)
+- 4GB+ RAM (CPU) ou 4GB+ VRAM (GPU)
 
-### Ver todos os datasets
+---
 
+## 🚀 Como Usar
+
+### 1. Menu Interativo (Recomendado!)
+
+O jeito mais fácil de usar o sistema:
+
+```bash
+./run.sh
+```
+
+O menu permite:
+- ✅ Treinar novos modelos (com assistente passo-a-passo)
+- ✅ Gerar imagens de modelos existentes
+- ✅ Listar datasets e modelos disponíveis
+- ✅ Ver status do treinamento
+- ✅ Configurar tudo de forma intuitiva
+
+**Exemplo de uso:**
+1. Execute `./run.sh`
+2. Escolha opção `1` (Treinar novo modelo)
+3. Selecione dataset (ex: `2` para MNIST)
+4. Selecione modelo (ex: `1` para DCGAN)
+5. Configure épocas (ex: `25`)
+6. Confirme e deixe treinar!
+
+---
+
+### 2. Linha de Comando
+
+Para usuários avançados ou automação:
+
+```bash
+# Sintaxe básica
+python train.py --dataset <dataset> --model <modelo> --epochs <num>
+
+# Exemplo: MNIST com DCGAN
+python train.py --dataset mnist --model dcgan --epochs 25
+
+# Exemplo: CIFAR-10 com WGAN-GP
+python train.py --dataset cifar10 --model wgan-gp --epochs 100
+
+# Ver todas as opções
+python train.py --help
+```
+
+---
+
+### 3. Gerar Imagens
+
+Após treinar, gere imagens do seu modelo:
+
+#### Opção A: Modo automático (mais fácil)
+```bash
+python quick_generate.py
+```
+- Encontra automaticamente o último modelo treinado
+- Pergunta quantas imagens gerar
+- Salva no mesmo diretório do modelo
+
+#### Opção B: Especificar checkpoint
+```bash
+python generate.py \
+  --checkpoint outputs/mnist/dcgan_20241107_120540/checkpoints/checkpoint_latest.pth \
+  --num-samples 64 \
+  --output minha_imagem.png
+```
+
+#### Opção C: Via menu interativo
+```bash
+./run.sh
+# Escolha opção 2 (Gerar imagens)
+```
+
+---
+
+## 📦 Datasets Disponíveis
+
+| Dataset           | Descrição                                     | Imagens  | Download     | Tamanho  | Canais |
+| ----------------- | --------------------------------------------- | -------- | ------------ | -------- | ------ |
+| **CIFAR-10**      | 10 categorias coloridas (aviões, carros, etc) | 60.000   | ✅ Automático | 32x32    | RGB    |
+| **MNIST**         | Dígitos 0-9 escritos à mão                    | 70.000   | ✅ Automático | 28x28    | Gray   |
+| **Fashion-MNIST** | Roupas e acessórios (10 categorias)           | 70.000   | ✅ Automático | 28x28    | Gray   |
+| **CelebA**        | Faces de celebridades                         | ~200.000 | ⚠️ Manual     | 178x218  | RGB    |
+| **Custom**        | Suas próprias imagens                         | Variável | 📁 Local      | Variável | RGB    |
+
+### Ver lista completa
 ```bash
 python train.py --list-datasets
 ```
 
-## 🤖 Modelos Suportados
+### Usar dataset customizado
 
-| Modelo      | Descrição                          | Velocidade | Qualidade       |
-| ----------- | ---------------------------------- | ---------- | --------------- |
-| **DCGAN**   | Deep Convolutional GAN             | ⚡ Rápido   | ⭐⭐⭐ Boa         |
-| **WGAN-GP** | Wasserstein GAN + Gradient Penalty | 🐢 Lento    | ⭐⭐⭐⭐⭐ Excelente |
+1. Organize suas imagens:
+```
+data/
+└── custom/
+    └── sua_categoria/
+        ├── imagem1.jpg
+        ├── imagem2.png
+        └── ...
+```
 
-### Ver todos os modelos
+2. Treine:
+```bash
+python train.py --dataset custom --model dcgan --epochs 100
+```
 
+---
+
+## 🤖 Modelos GAN
+
+### 1. DCGAN (Deep Convolutional GAN)
+**Recomendado para: Iniciantes, treinamento rápido**
+
+```bash
+python train.py --dataset mnist --model dcgan --epochs 25
+```
+
+**Características:**
+- ✅ Estável e fácil de treinar
+- ✅ Bons resultados com configurações padrão
+- ✅ Mais rápido (~2x que WGAN-GP)
+- 📄 Paper: [Radford et al., 2015](https://arxiv.org/abs/1511.06434)
+
+**Configurações padrão:**
+- Learning rate: `0.0002`
+- Beta1: `0.5`
+- Otimizador: Adam
+
+---
+
+### 2. WGAN-GP (Wasserstein GAN + Gradient Penalty)
+**Recomendado para: Melhor qualidade, projetos sérios**
+
+```bash
+python train.py --dataset cifar10 --model wgan-gp --epochs 100
+```
+
+**Características:**
+- ✅ Treinamento mais estável
+- ✅ Menos mode collapse
+- ✅ Melhor qualidade de imagens
+- ⚠️ Mais lento (5x treino do discriminador)
+- 📄 Paper: [Gulrajani et al., 2017](https://arxiv.org/abs/1704.00028)
+
+**Configurações padrão:**
+- Learning rate: `0.0001`
+- Beta1: `0.0`
+- N_critic: `5` (treina critic 5x por batch)
+- Lambda_gp: `10.0` (gradient penalty)
+
+---
+
+### Ver lista completa
 ```bash
 python train.py --list-models
 ```
 
-## 💡 Exemplos de Uso
+---
 
-### Exemplo 1: Treinamento Básico
+## 💡 Exemplos Práticos
 
+### 🎯 Teste Rápido (5 minutos)
 ```bash
-python train.py --dataset cifar10 --model dcgan --epochs 50
+python train.py --dataset mnist --model dcgan --epochs 5 --batch-size 128
 ```
 
-### Exemplo 2: Alta Qualidade (requer mais tempo)
+### 🚀 Treinamento Básico (30 minutos)
+```bash
+python train.py --dataset mnist --model dcgan --epochs 25
+```
 
+### 🎨 Qualidade Média (1-2 horas)
+```bash
+python train.py --dataset cifar10 --model dcgan --epochs 50 --batch-size 64
+```
+
+### ⭐ Alta Qualidade (3-5 horas)
 ```bash
 python train.py --dataset cifar10 --model wgan-gp --epochs 200 --batch-size 64
 ```
 
-### Exemplo 3: Teste Rápido
-
-```bash
-python train.py --dataset mnist --model dcgan --epochs 5
-```
-
-### Exemplo 4: Imagens de Alta Resolução
-
+### 🖼️ Imagens de Alta Resolução (5+ horas)
 ```bash
 python train.py --dataset celeba --model dcgan --img-size 128 --ngf 128 --ndf 128 --epochs 100
 ```
 
-### Exemplo 5: GPU com Pouca Memória
-
+### 💾 GPU com Pouca Memória
 ```bash
-python train.py --dataset fashion-mnist --model dcgan --batch-size 32
+python train.py --dataset fashion-mnist --model dcgan --batch-size 32 --workers 2
 ```
 
-### Exemplo 6: Dataset Customizado
-
+### 📁 Dataset Customizado
 ```bash
-# Organize suas imagens em: data/custom/categoria/
-python train.py --dataset custom --model dcgan --epochs 100
+python train.py --dataset custom --model dcgan --epochs 100 --img-size 64
 ```
-
-## ⚙️ Parâmetros Principais
-
-```bash
-python train.py \
-  --dataset <dataset>      # Dataset: cifar10, mnist, fashion-mnist, celeba, custom
-  --model <modelo>         # Modelo: dcgan, wgan-gp
-  --epochs <num>           # Número de épocas (padrão: 50)
-  --batch-size <num>       # Tamanho do batch (padrão: 128)
-  --img-size <num>         # Tamanho das imagens (padrão: 64)
-  --lr <float>             # Learning rate (auto se não especificado)
-  --nz <num>               # Tamanho vetor latente (padrão: 100)
-  --ngf <num>              # Filtros do gerador (padrão: 64)
-  --ndf <num>              # Filtros do discriminador (padrão: 64)
-  --workers <num>          # Workers DataLoader (padrão: 2)
-  --ngpu <num>             # Número de GPUs (padrão: 1)
-```
-
-## 📂 Estrutura do Projeto
-
-```bash
-projeto-geracao-imagem/
-├── train.py              # ⭐ Script principal de treinamento
-├── generate.py           # 🎨 Gerar imagens de modelos treinados
-├── models.py             # 🤖 Arquiteturas GAN (DCGAN, WGAN-GP)
-├── config.py             # ⚙️ Configurações de datasets e modelos
-├── utils.py              # 🛠️ Funções auxiliares
-├── requirements.txt      # 📦 Dependências
-├── TRAINING_GUIDE.md     # 📖 Guia completo de treinamento
-└── outputs/              # 📁 Resultados dos treinamentos
-    └── <dataset>/
-        └── <modelo>_<timestamp>/
-            ├── config.json
-            ├── training.log
-            ├── training_losses.png
-            ├── final_samples.png
-            ├── samples/
-            └── checkpoints/
-```
-
-## 📊 Resultados do Treinamento
-
-Após o treinamento, você terá:
-
-```bash
-outputs/cifar10/dcgan_20240115_143000/
-├── config.json                    # Configurações usadas
-├── training.log                   # Log detalhado
-├── training_losses.png            # Gráfico de perdas
-├── final_samples.png              # Amostras finais
-├── samples/                       # Amostras por época
-│   ├── epoch_5.png
-│   ├── epoch_10.png
-│   └── ...
-└── checkpoints/                   # Modelos salvos
-    ├── checkpoint_epoch_10.pth
-    ├── checkpoint_epoch_20.pth
-    └── checkpoint_latest.pth
-```
-
-## 🎯 Compartilhando Modelos
-
-### Para compartilhar seu modelo treinado
-
-#### 1. **Compactar checkpoint:**
-
-```bash
-cd outputs/cifar10/dcgan_xxx/checkpoints/
-zip meu_modelo.zip checkpoint_latest.pth
-```
-
-#### 2. **Outras pessoas podem usar:**
-
-```bash
-# Download do modelo compartilhado
-unzip meu_modelo.zip
-
-# Gerar imagens
-python generate.py --checkpoint checkpoint_latest.pth --num-samples 100
-```
-
-### O checkpoint contém
-
-- ✅ Pesos do gerador
-- ✅ Pesos do discriminador
-- ✅ Estados dos otimizadores
-- ✅ Configurações completas
-- ✅ Histórico de perdas
-
-## 🔧 Requisitos
-
-- Python 3.8+
-- PyTorch 2.0+
-- CUDA (opcional, mas recomendado)
-- 4GB+ RAM (CPU) ou 4GB+ VRAM (GPU)
-
-## 📖 Documentação Completa
-
-Para guia detalhado com exemplos, dicas e troubleshooting:
-
-👉 **[TRAINING_GUIDE.md](TRAINING_GUIDE.md)** 👈
-
-## 🚀 Próximos Passos
-
-Depois de treinar seu modelo:
-
-1. **Gerar imagens:**
-
-   ```bash
-   python generate.py --checkpoint outputs/.../checkpoint_latest.pth
-   ```
-
-2. **Compartilhar no GitHub:**
-   - Adicione checkpoints ao `.gitignore` (são grandes!)
-   - Compartilhe apenas o código
-   - Use Git LFS para modelos (opcional)
-
-3. **Experimentar:**
-   - Tente diferentes datasets
-   - Ajuste hiperparâmetros
-   - Compare DCGAN vs WGAN-GP
-
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Para adicionar:
-
-- Novos datasets: Edite `config.py`
-- Novos modelos: Edite `models.py`
-- Melhorias: Abra um Pull Request
-
-## 📝 Licença
-
-Open source - Use e modifique livremente!
-
-## 🎓 Recursos de Aprendizado
-
-- **DCGAN Paper:** <https://arxiv.org/abs/1511.06434>
-- **WGAN-GP Paper:** <https://arxiv.org/abs/1704.00028>
-- **PyTorch Tutorials:** <https://pytorch.org/tutorials/>
-
-## ❓ FAQ
-
-**P: Quanto tempo leva para treinar?**
-R: Depende do dataset e GPU. MNIST: ~10min, CIFAR-10: ~1h, CelebA: ~3h (GPU)
-
-**P: Preciso de GPU?**
-R: Não é obrigatório, mas recomendado. CPU é muito mais lento.
-
-**P: Qual modelo usar?**
-R: DCGAN para começar, WGAN-GP para melhor qualidade.
-
-**P: Quantas épocas são necessárias?**
-R: MNIST: 25, CIFAR-10: 50-100, CelebA: 100-200
-
-**P: Como usar meu próprio dataset?**
-R: Organize em `data/custom/categoria/` e use `--dataset custom`
 
 ---
 
-**Dúvidas?** Abra uma issue! 🚀
+## ⚙️ Parâmetros Avançados
 
-**Gostou?** Dê uma ⭐ no projeto!
+### Parâmetros Principais
+
+```bash
+python train.py \
+  --dataset <nome>         # Dataset: cifar10, mnist, fashion-mnist, celeba, custom
+  --model <nome>           # Modelo: dcgan, wgan-gp
+  --epochs <num>           # Número de épocas (padrão: 50)
+  --batch-size <num>       # Tamanho do batch (padrão: 128)
+  --img-size <num>         # Tamanho da imagem (padrão: 64 ou do dataset)
+  --lr <float>             # Learning rate (auto-detectado se omitido)
+  --nz <num>               # Dimensão do vetor latente (padrão: 100)
+  --ngf <num>              # Filtros do gerador (padrão: 64)
+  --ndf <num>              # Filtros do discriminador (padrão: 64)
+  --workers <num>          # Workers do DataLoader (padrão: 2)
+  --ngpu <num>             # Número de GPUs (padrão: 1)
+```
+
+### Exemplos de Configurações
+
+#### Aumentar capacidade do modelo
+```bash
+--ngf 128 --ndf 128  # Mais filtros = mais capacidade
+```
+
+#### Ajustar learning rate
+```bash
+--lr 0.0001  # Menor = mais estável, mais lento
+--lr 0.0005  # Maior = mais rápido, menos estável
+```
+
+#### Usar múltiplas GPUs
+```bash
+--ngpu 2  # Usar 2 GPUs
+```
+
+#### Processar mais dados em paralelo
+```bash
+--workers 4  # Mais workers = carregamento mais rápido
+```
+
+### Ver todas as opções
+```bash
+python train.py --help
+```
+
+---
+
+## 📂 Estrutura de Saída
+
+Após o treinamento, os resultados são salvos em `outputs/`:
+
+```
+outputs/
+└── <dataset>/
+    └── <modelo>_<timestamp>/
+        ├── config.json              # ⚙️ Configurações usadas
+        ├── training.log             # 📝 Log completo do treinamento
+        ├── training_losses.png      # 📊 Gráfico de perdas
+        ├── final_samples.png        # 🎨 Imagens finais geradas
+        ├── samples/                 # 📸 Amostras por época
+        │   ├── epoch_5.png
+        │   ├── epoch_10.png
+        │   └── ...
+        └── checkpoints/             # 💾 Modelos salvos
+            ├── checkpoint_epoch_10.pth
+            ├── checkpoint_epoch_20.pth
+            └── checkpoint_latest.pth  # ⭐ Último checkpoint
+```
+
+### Exemplo real:
+```
+outputs/mnist/dcgan_20241107_120540/
+├── config.json                    # Hiperparâmetros usados
+├── training.log                   # "Epoch 1/25, Loss_D: 0.5, Loss_G: 1.2, ..."
+├── training_losses.png            # Gráfico D_loss vs G_loss
+├── final_samples.png              # Grid 8x8 de imagens geradas
+├── samples/
+│   ├── epoch_5.png               # Como estava na época 5
+│   ├── epoch_10.png
+│   └── epoch_25.png
+└── checkpoints/
+    ├── checkpoint_epoch_10.pth   # Checkpoint da época 10 (75MB)
+    ├── checkpoint_epoch_20.pth   # Checkpoint da época 20 (75MB)
+    └── checkpoint_latest.pth     # Checkpoint final (75MB)
+```
+
+### O que cada checkpoint contém:
+- ✅ Pesos completos do gerador
+- ✅ Pesos completos do discriminador
+- ✅ Estados dos otimizadores
+- ✅ Configurações do modelo
+- ✅ Histórico de perdas
+- ✅ Época atual
+
+**Você pode retomar o treinamento de qualquer checkpoint!**
+
+---
+
+## 🔧 Troubleshooting
+
+### ❌ "CUDA out of memory"
+**Solução:** Reduza batch size ou tamanho da imagem
+```bash
+python train.py --dataset mnist --model dcgan --batch-size 32 --img-size 32
+```
+
+### ❌ "No module named 'torch'"
+**Solução:** Instale PyTorch
+```bash
+pip install torch torchvision
+```
+
+### ❌ "RuntimeError: CUDA not available"
+**Solução:** Treine na CPU (mais lento, mas funciona)
+```bash
+# O código detecta automaticamente e usa CPU
+python train.py --dataset mnist --model dcgan --epochs 10
+```
+
+### ❌ "FileNotFoundError: data/custom not found"
+**Solução:** Crie a estrutura de pastas correta
+```bash
+mkdir -p data/custom/sua_categoria
+# Coloque suas imagens em data/custom/sua_categoria/
+```
+
+### ❌ Treinamento muito lento
+**Soluções:**
+```bash
+# 1. Use GPU se disponível
+nvidia-smi  # Verifica se GPU está disponível
+
+# 2. Reduza epochs para testes
+python train.py --dataset mnist --model dcgan --epochs 5
+
+# 3. Use dataset menor
+python train.py --dataset mnist --model dcgan  # Mais rápido que cifar10
+
+# 4. Use DCGAN em vez de WGAN-GP
+python train.py --dataset cifar10 --model dcgan  # 2x mais rápido
+```
+
+### ❌ Imagens geradas ruins
+**Soluções:**
+```bash
+# 1. Treine por mais épocas
+python train.py --dataset mnist --model dcgan --epochs 50
+
+# 2. Use WGAN-GP para melhor qualidade
+python train.py --dataset mnist --model wgan-gp --epochs 100
+
+# 3. Ajuste learning rate
+python train.py --dataset mnist --model dcgan --lr 0.0001
+
+# 4. Aumente capacidade do modelo
+python train.py --dataset mnist --model dcgan --ngf 128 --ndf 128
+```
+
+### ❌ "Mode collapse" (imagens todas iguais)
+**Solução:** Use WGAN-GP
+```bash
+python train.py --dataset cifar10 --model wgan-gp --epochs 100
+```
+
+---
+
+## ❓ FAQ
+
+### Q: Quanto tempo leva para treinar?
+**A:** Depende do dataset e hardware:
+- **MNIST (DCGAN, GPU):** ~10-15 minutos (25 épocas)
+- **CIFAR-10 (DCGAN, GPU):** ~1-2 horas (50 épocas)
+- **CIFAR-10 (WGAN-GP, GPU):** ~3-5 horas (100 épocas)
+- **CelebA (DCGAN, GPU):** ~5-8 horas (100 épocas)
+- **CPU:** ~10-20x mais lento que GPU
+
+### Q: Preciso de GPU?
+**A:** Não é obrigatório, mas **fortemente recomendado**:
+- ✅ GPU: Treinamento em horas
+- ❌ CPU: Treinamento em dias
+
+### Q: Qual modelo usar?
+**A:**
+- **Iniciante/Teste:** DCGAN (mais rápido, mais fácil)
+- **Qualidade/Produção:** WGAN-GP (melhor resultado, mais lento)
+
+### Q: Quantas épocas treinar?
+**A:** Recomendações:
+- **MNIST:** 25-50 épocas
+- **Fashion-MNIST:** 50-75 épocas
+- **CIFAR-10:** 50-100 épocas (DCGAN) ou 100-200 (WGAN-GP)
+- **CelebA:** 100-200 épocas
+
+### Q: Como usar minhas próprias imagens?
+**A:**
+1. Crie pasta: `data/custom/categoria/`
+2. Coloque suas imagens (.jpg, .png)
+3. Execute: `python train.py --dataset custom --model dcgan --epochs 100`
+4. Recomendado: 10.000+ imagens para bons resultados
+
+### Q: Posso retomar um treinamento interrompido?
+**A:** Sim! (em desenvolvimento - será adicionado em breve)
+
+### Q: Como compartilhar meu modelo treinado?
+**A:**
+1. **Compactar checkpoint:**
+   ```bash
+   cd outputs/mnist/dcgan_xxx/checkpoints/
+   zip meu_modelo.zip checkpoint_latest.pth
+   ```
+
+2. **Compartilhar via:**
+   - GitHub Releases (recomendado para <2GB)
+   - Google Drive / Dropbox
+   - Hugging Face Hub
+
+3. **Outros podem usar:**
+   ```bash
+   python generate.py --checkpoint checkpoint_latest.pth --num-samples 100
+   ```
+
+### Q: Qual tamanho de batch usar?
+**A:** Depende da memória da GPU:
+- **16GB+ VRAM:** batch-size 128-256
+- **8GB VRAM:** batch-size 64-128
+- **4GB VRAM:** batch-size 32-64
+- **CPU:** batch-size 32
+
+### Q: O que é "mode collapse"?
+**A:** Quando o gerador produz sempre as mesmas imagens. **Solução:** Use WGAN-GP.
+
+### Q: Como melhorar a qualidade das imagens?
+**A:**
+1. Treine por mais épocas
+2. Use WGAN-GP em vez de DCGAN
+3. Aumente capacidade: `--ngf 128 --ndf 128`
+4. Use dataset maior e de melhor qualidade
+5. Ajuste learning rate: `--lr 0.0001`
+
+---
+
+## 📚 Recursos de Aprendizado
+
+- 📄 **DCGAN Paper:** https://arxiv.org/abs/1511.06434
+- 📄 **WGAN-GP Paper:** https://arxiv.org/abs/1704.00028
+- 📖 **PyTorch Tutorials:** https://pytorch.org/tutorials/
+- 🎓 **GANs Course:** https://www.coursera.org/learn/generative-adversarial-networks-gans
+
+---
+
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas!
+
+Para adicionar:
+- **Novo dataset:** Edite `config.py` → função `get_dataset()`
+- **Novo modelo:** Edite `models.py` → adicione classe do modelo
+- **Nova feature:** Abra um Pull Request
+
+---
+
+## 📝 Licença
+
+Projeto open source - Use e modifique livremente!
+
+---
+
+## 🎯 Próximos Passos
+
+1. **Instale as dependências:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Execute o menu interativo:**
+   ```bash
+   ./run.sh
+   ```
+
+3. **Ou faça seu primeiro treinamento:**
+   ```bash
+   python train.py --dataset mnist --model dcgan --epochs 25
+   ```
+
+4. **Gere imagens:**
+   ```bash
+   python quick_generate.py
+   ```
+
+5. **Experimente outros datasets e modelos!**
+
+---
+
+## 📞 Suporte
+
+- 🐛 **Bug?** Abra uma [issue](https://github.com/seu-usuario/projeto-geracao-imagem/issues)
+- 💡 **Sugestão?** Abra uma [discussion](https://github.com/seu-usuario/projeto-geracao-imagem/discussions)
+- ⭐ **Gostou?** Dê uma estrela no projeto!
+
+---
+
+**Bom treinamento! 🚀🎨**
