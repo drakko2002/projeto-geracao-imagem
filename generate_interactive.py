@@ -6,12 +6,13 @@ Este script permite:
 1. Gerar imagens de classes específicas (ex: "gato" no CIFAR-10, "5" no MNIST)
 2. Modo interativo com menu
 3. Geração guiada por prompts
+4. Upscaling automático para alta resolução
 
 Nota: Para GANs incondicionais (sem labels no treinamento), as imagens são geradas
 aleatoriamente. Para controle real de classes, é necessário treinar um Conditional GAN (c-GAN).
 
 Uso:
-    # Modo interativo
+    # Modo interativo (gera 1 imagem em alta resolução)
     python generate_interactive.py --checkpoint outputs/cifar10/dcgan_xxx/checkpoints/checkpoint_latest.pth
 
     # Especificar classe
@@ -19,6 +20,12 @@ Uso:
 
     # Com prompt (simulado para GANs incondicionais)
     python generate_interactive.py --checkpoint outputs/cifar10/dcgan_xxx/checkpoints/checkpoint_latest.pth --prompt "gerar um gato"
+
+    # Desabilitar upscaling
+    python generate_interactive.py --checkpoint outputs/cifar10/dcgan_xxx/checkpoints/checkpoint_latest.pth --upscale 1
+
+    # Gerar múltiplas imagens
+    python generate_interactive.py --checkpoint outputs/cifar10/dcgan_xxx/checkpoints/checkpoint_latest.pth --num-samples 16
 """
 
 import argparse
@@ -26,11 +33,81 @@ import json
 import os
 import re
 
+import numpy as np
 import torch
+from PIL import Image, ImageEnhance
 
 from config import DATASET_CONFIGS
 from models import get_model
 from utils import generate_samples
+
+
+def upscale_image(image_tensor, scale_factor, method="lanczos", sharpen=1.0):
+    """
+    Faz upscaling de um tensor de imagem
+
+    Args:
+        image_tensor: Tensor PyTorch (C, H, W) normalizado em [-1, 1]
+        scale_factor: Fator de escala (2, 4, 8, etc)
+        method: Método de interpolação ('lanczos', 'bicubic', 'nearest')
+        sharpen: Fator de nitidez (1.0 = sem alteração, >1.0 = mais nítido)
+
+    Returns:
+        Tensor upscaled no mesmo formato
+    """
+    if scale_factor == 1:
+        return image_tensor
+
+    # Converter tensor para PIL Image
+    # Desnormalizar: [-1, 1] -> [0, 1]
+    img_np = ((image_tensor + 1) / 2).clamp(0, 1).cpu().numpy()
+
+    # Converter de (C, H, W) para (H, W, C)
+    img_np = np.transpose(img_np, (1, 2, 0))
+
+    # Converter para uint8
+    img_np = (img_np * 255).astype(np.uint8)
+
+    # Converter para PIL
+    if img_np.shape[2] == 1:
+        # Grayscale
+        pil_image = Image.fromarray(img_np[:, :, 0], mode="L")
+    else:
+        # RGB
+        pil_image = Image.fromarray(img_np, mode="RGB")
+
+    # Aplicar upscaling
+    width, height = pil_image.size
+    new_size = (width * scale_factor, height * scale_factor)
+
+    if method == "lanczos":
+        upscaled = pil_image.resize(new_size, Image.LANCZOS)
+    elif method == "bicubic":
+        upscaled = pil_image.resize(new_size, Image.BICUBIC)
+    elif method == "nearest":
+        upscaled = pil_image.resize(new_size, Image.NEAREST)
+    else:
+        upscaled = pil_image.resize(new_size, Image.LANCZOS)
+
+    # Aplicar nitidez
+    if sharpen > 1.0:
+        enhancer = ImageEnhance.Sharpness(upscaled)
+        upscaled = enhancer.enhance(sharpen)
+
+    # Converter de volta para tensor
+    img_np = np.array(upscaled).astype(np.float32) / 255.0
+
+    # Adicionar dimensão de canal se necessário (grayscale)
+    if len(img_np.shape) == 2:
+        img_np = img_np[:, :, np.newaxis]
+
+    # Converter de (H, W, C) para (C, H, W)
+    img_np = np.transpose(img_np, (2, 0, 1))
+
+    # Normalizar de volta para [-1, 1]
+    img_tensor = torch.from_numpy(img_np) * 2 - 1
+
+    return img_tensor
 
 
 def parse_prompt(prompt, dataset_name):
@@ -248,8 +325,8 @@ Para GANs incondicionais, a seleção de classe é apenas simulada.
     parser.add_argument(
         "--num-samples",
         type=int,
-        default=16,
-        help="Número de imagens a gerar (padrão: 16)",
+        default=1,
+        help="Número de imagens a gerar (padrão: 1)",
     )
     parser.add_argument(
         "--output",
@@ -273,6 +350,25 @@ Para GANs incondicionais, a seleção de classe é apenas simulada.
         "--no-interactive",
         action="store_true",
         help="Desabilitar modo interativo",
+    )
+    parser.add_argument(
+        "--upscale",
+        type=int,
+        default=8,
+        help="Fator de upscaling automático (padrão: 8x, use 1 para desabilitar)",
+    )
+    parser.add_argument(
+        "--upscale-method",
+        type=str,
+        default="lanczos",
+        choices=["lanczos", "bicubic", "nearest"],
+        help="Método de upscaling (padrão: lanczos)",
+    )
+    parser.add_argument(
+        "--sharpen",
+        type=float,
+        default=1.6,
+        help="Fator de nitidez no upscaling (1.0-2.0, padrão: 1.6, use 1.0 para desabilitar)",
     )
 
     args = parser.parse_args()
@@ -352,6 +448,8 @@ Para GANs incondicionais, a seleção de classe é apenas simulada.
             return
 
     # Gerar imagens
+    print(f"\n🎨 Gerando {args.num_samples} imagem(ns)...")
+
     fake_images = generate_with_class(
         generator,
         args.num_samples,
@@ -361,6 +459,32 @@ Para GANs incondicionais, a seleção de classe é apenas simulada.
         dataset_name,
     )
 
+    original_size = fake_images.shape[-1]  # Altura/largura original
+
+    # Aplicar upscaling se necessário
+    if args.upscale > 1:
+        print(
+            f"\n📐 Aplicando upscaling {args.upscale}x ({original_size}x{original_size} → {original_size * args.upscale}x{original_size * args.upscale})..."
+        )
+        print(f"   Método: {args.upscale_method}")
+        if args.sharpen > 1.0:
+            print(f"   Nitidez: {args.sharpen}")
+
+        upscaled_images = []
+        for i in range(fake_images.shape[0]):
+            upscaled = upscale_image(
+                fake_images[i],
+                args.upscale,
+                method=args.upscale_method,
+                sharpen=args.sharpen,
+            )
+            upscaled_images.append(upscaled)
+
+        fake_images = torch.stack(upscaled_images)
+        final_size = original_size * args.upscale
+    else:
+        final_size = original_size
+
     # Determinar caminho de saída
     if args.output is None:
         checkpoint_dir = os.path.dirname(args.checkpoint)
@@ -368,34 +492,88 @@ Para GANs incondicionais, a seleção de classe é apenas simulada.
 
         if selected_class:
             class_safe = selected_class.replace(" ", "_").replace("/", "_")
-            filename = f"generated_{class_safe}_{args.num_samples}.png"
+            base_filename = f"generated_{class_safe}"
         else:
-            filename = f"generated_mixed_{args.num_samples}.png"
+            base_filename = f"generated"
 
-        args.output = os.path.join(parent_dir, filename)
+        # Adicionar informação de upscale no nome
+        if args.upscale > 1:
+            base_filename += f"_{final_size}x{final_size}"
+
+        args.output = os.path.join(parent_dir, base_filename)
 
     # Salvar imagens
     from torchvision.utils import save_image
 
-    save_image(
-        fake_images,
-        args.output,
-        nrow=args.nrow,
-        normalize=True,
-        value_range=(-1, 1),
-    )
+    print(f"\n💾 Salvando imagem(ns)...")
 
-    print(f"\n✅ Imagens geradas e salvas em: {args.output}")
-    print(f"   Total de imagens: {args.num_samples}")
-    print(f"   Grid: {args.nrow} imagens por linha")
+    if args.num_samples == 1:
+        # Salvar imagem única
+        output_path = (
+            args.output if args.output.endswith(".png") else args.output + ".png"
+        )
+        save_image(
+            fake_images[0],
+            output_path,
+            normalize=True,
+            value_range=(-1, 1),
+        )
+        print(f"\n✅ Imagem gerada e salva em: {output_path}")
+        print(f"   Resolução: {final_size}x{final_size}")
+        if selected_class:
+            print(f"   Tema: {selected_class}")
+        if args.upscale > 1:
+            print(
+                f"   Upscaling: {args.upscale}x ({original_size}x{original_size} → {final_size}x{final_size})"
+            )
+            print(f"   Método: {args.upscale_method}")
+    else:
+        # Salvar grid de múltiplas imagens
+        grid_path = (
+            args.output if args.output.endswith(".png") else args.output + "_grid.png"
+        )
+        save_image(
+            fake_images,
+            grid_path,
+            nrow=args.nrow,
+            normalize=True,
+            value_range=(-1, 1),
+        )
 
-    if selected_class:
-        print(f"   Tema: {selected_class}")
+        # Também salvar individualmente
+        output_dir = args.output + "_individual"
+        os.makedirs(output_dir, exist_ok=True)
 
-    print("\n" + "=" * 60)
-    print("💡 DICA: Para controle real de classes:")
-    print("   Treine um Conditional GAN (c-GAN) que usa labels durante o treinamento")
-    print("=" * 60)
+        for i in range(args.num_samples):
+            individual_path = os.path.join(output_dir, f"image_{i+1:03d}.png")
+            save_image(
+                fake_images[i],
+                individual_path,
+                normalize=True,
+                value_range=(-1, 1),
+            )
+
+        print(f"\n✅ Imagens geradas e salvas:")
+        print(f"   Grid: {grid_path}")
+        print(f"   Individuais: {output_dir}/ (1-{args.num_samples})")
+        print(f"   Resolução: {final_size}x{final_size}")
+        print(f"   Total: {args.num_samples} imagens")
+        if selected_class:
+            print(f"   Tema: {selected_class}")
+        if args.upscale > 1:
+            print(
+                f"   Upscaling: {args.upscale}x ({original_size}x{original_size} → {final_size}x{final_size})"
+            )
+
+    print("\n" + "=" * 70)
+    if args.upscale > 1:
+        print("✨ Imagem gerada em ALTA RESOLUÇÃO com upscaling automático!")
+    print("💡 DICAS:")
+    print("   • Use --upscale 1 para desabilitar upscaling")
+    print("   • Use --upscale-method esrgan para máxima qualidade (requer instalação)")
+    print("   • Use --sharpen 1.0 para desabilitar aumento de nitidez")
+    print("   • Para controle real de classes, treine um Conditional GAN (c-GAN)")
+    print("=" * 70)
 
     print("\n✨ Concluído!\n")
 

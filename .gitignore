@@ -1,50 +1,61 @@
-# Tokens e configurações sensíveis
+# ══════════════════════════════════════════════════════════════
+# CONFIGURAÇÕES SENSÍVEIS
+# ══════════════════════════════════════════════════════════════
 local.env
 .env
 
-# Python
-bin/
+# ══════════════════════════════════════════════════════════════
+# AMBIENTES VIRTUAIS PYTHON
+# ══════════════════════════════════════════════════════════════
 venv/
 env/
 ENV/
-
-# Dependências e cache
-compiler_compat/
-conda-meta/
-etc/
-include/
+.venv/
+bin/
 lib/
 lib64/
-man/
-opt/
+include/
 share/
-ssl/
+pyvenv.cfg
 
-# Datasets (muito grandes)
+# ══════════════════════════════════════════════════════════════
+# DATASETS (ARQUIVOS GRANDES)
+# ══════════════════════════════════════════════════════════════
 data/
 *.tar.gz
-*.zip
 *.7z
 
-# Modelos e saídas (muito grandes)
-model/
-models/
+# ══════════════════════════════════════════════════════════════
+# MODELOS E CHECKPOINTS (ARQUIVOS GRANDES)
+# ══════════════════════════════════════════════════════════════
 outputs/
+pretrained_models/
 *.pth
 *.pt
 *.ckpt
 
-# Imagens geradas
+# Exceto modelos de exemplo (se necessário)
+# !pretrained_models/exemplo_pequeno.pth
+
+# ══════════════════════════════════════════════════════════════
+# IMAGENS GERADAS
+# ══════════════════════════════════════════════════════════════
 *.png
 *.jpg
 *.jpeg
+*.gif
 
 # Exceto imagens de documentação
 !docs/*.png
+!docs/*.jpg
 !images/*.png
+!images/*.jpg
 !README_images/*.png
+!README_images/*.jpg
 
-# Python cache
+# ══════════════════════════════════════════════════════════════
+# PYTHON CACHE E BUILD
+# ══════════════════════════════════════════════════════════════
 __pycache__/
 *.py[cod]
 *$py.class
@@ -59,28 +70,52 @@ eggs/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# IDEs
+# ══════════════════════════════════════════════════════════════
+# IDEs E EDITORES
+# ══════════════════════════════════════════════════════════════
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 .DS_Store
+*.sublime-project
+*.sublime-workspace
 
-# Jupyter
+# ══════════════════════════════════════════════════════════════
+# JUPYTER NOTEBOOKS
+# ══════════════════════════════════════════════════════════════
 .ipynb_checkpoints/
 *.ipynb
 
-# Logs
+# ══════════════════════════════════════════════════════════════
+# LOGS
+# ══════════════════════════════════════════════════════════════
 *.log
 training.log
+logs/
 
-# Backup/Temporários
+# ══════════════════════════════════════════════════════════════
+# TEMPORÁRIOS E BACKUPS
+# ══════════════════════════════════════════════════════════════
 _old_files/
 backup/
 tmp/
 temp/
+*.tmp
+*.bak
+*~
 
-# Modelos exemplo (se quiser incluir um modelo pequeno)
-# !pretrained_models/mnist_example.pth
+# ══════════════════════════════════════════════════════════════
+# ARQUIVOS DE TESTE (LOCAIS)
+# ══════════════════════════════════════════════════════════════
+test_download.sh
+test_*.py
+
+# ══════════════════════════════════════════════════════════════
+# ARQUIVOS ESPECÍFICOS DO SISTEMA
+# ══════════════════════════════════════════════════════════════
+Thumbs.db
+desktop.ini

@@ -49,10 +49,11 @@ show_main_menu() {
     echo -e "  ${GREEN}2)${NC} ⚡ Exemplos rápidos             ${CYAN}(treinamentos predefinidos)${NC}"
     echo -e "  ${GREEN}3)${NC} 🎨 Gerar imagens               ${CYAN}(aleatórias de modelos treinados)${NC}"
     echo -e "  ${GREEN}4)${NC} 🎯 Gerar por classe            ${CYAN}(escolha o que gerar!)${NC} ${YELLOW}← NOVO!${NC}"
-    echo -e "  ${GREEN}5)${NC} 📊 Ver treinamentos            ${CYAN}(status e resultados)${NC}"
-    echo -e "  ${GREEN}6)${NC} 📦 Datasets disponíveis        ${CYAN}(listar e info)${NC}"
-    echo -e "  ${GREEN}7)${NC} 🤖 Modelos disponíveis         ${CYAN}(DCGAN, WGAN-GP)${NC}"
-    echo -e "  ${GREEN}8)${NC} 📖 Ajuda                       ${CYAN}(guia e troubleshooting)${NC}"
+    echo -e "  ${GREEN}5)${NC} � Upscale de imagens          ${CYAN}(aumentar resolução!)${NC} ${YELLOW}← NOVO!${NC}"
+    echo -e "  ${GREEN}6)${NC} �📊 Ver treinamentos            ${CYAN}(status e resultados)${NC}"
+    echo -e "  ${GREEN}7)${NC} 📦 Datasets disponíveis        ${CYAN}(listar e info)${NC}"
+    echo -e "  ${GREEN}8)${NC} 🤖 Modelos disponíveis         ${CYAN}(DCGAN, WGAN-GP)${NC}"
+    echo -e "  ${GREEN}9)${NC} 📖 Ajuda                       ${CYAN}(guia e troubleshooting)${NC}"
     echo -e "  ${GREEN}0)${NC} ❌ Sair"
     echo ""
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -427,14 +428,17 @@ generate_by_class() {
     
     case $mode_choice in
         1)
-            # Modo interativo (padrão do script)
+            # Modo interativo (padrão do script) - 1 imagem em alta resolução
             echo ""
-            echo -e "${GREEN}🎨 Iniciando gerador interativo...${NC}"
+            echo -e "${GREEN}🎨 Modo interativo - Geração em alta resolução${NC}"
+            echo -e "${CYAN}   • Gera 1 imagem por vez${NC}"
+            echo -e "${CYAN}   • Upscaling automático 8x (ex: 28x28 → 224x224)${NC}"
+            echo -e "${CYAN}   • Alta qualidade com nitidez aprimorada${NC}"
             echo ""
             python generate_interactive.py --checkpoint "$CHECKPOINT_PATH"
             ;;
         2)
-            # Prompt de texto
+            # Prompt de texto - 1 imagem em alta resolução
             echo ""
             echo -e "${CYAN}💬 Digite o que você quer gerar:${NC}"
             echo -e "${CYAN}   Exemplos:${NC}"
@@ -450,19 +454,16 @@ generate_by_class() {
                 return
             fi
             
-            read -p "$(echo -e ${YELLOW}Quantas imagens gerar? [padrão: 16]: ${NC})" num_samples
-            NUM_SAMPLES=${num_samples:-16}
-            
             echo ""
-            echo -e "${GREEN}🎨 Gerando com prompt: '$prompt'${NC}"
+            echo -e "${GREEN}🎨 Gerando 1 imagem em alta resolução com prompt: '$prompt'${NC}"
             echo ""
             python generate_interactive.py \
                 --checkpoint "$CHECKPOINT_PATH" \
                 --prompt "$prompt" \
-                --num-samples "$NUM_SAMPLES"
+                --num-samples 1
             ;;
         3)
-            # Classe específica
+            # Classe específica - opção de múltiplas ou única
             echo ""
             read -p "$(echo -e ${YELLOW}"Nome da classe (ex: gato, 5, Camiseta): "${NC})" class_name
             
@@ -472,11 +473,32 @@ generate_by_class() {
                 return
             fi
             
-            read -p "$(echo -e ${YELLOW}Quantas imagens gerar? [padrão: 16]: ${NC})" num_samples
-            NUM_SAMPLES=${num_samples:-16}
-            
             echo ""
-            echo -e "${GREEN}🎨 Gerando classe: '$class_name'${NC}"
+            echo -e "${CYAN}Quantas imagens gerar?${NC}"
+            echo -e "  ${GREEN}1)${NC} 1 imagem em alta resolução ${YELLOW}(Recomendado)${NC}"
+            echo -e "  ${GREEN}2)${NC} Múltiplas imagens (grid)"
+            echo ""
+            read -p "$(echo -e ${YELLOW}Escolha [1-2]: ${NC})" img_mode
+            
+            case $img_mode in
+                1|"")
+                    NUM_SAMPLES=1
+                    echo ""
+                    echo -e "${GREEN}🎨 Gerando 1 imagem em alta resolução: '$class_name'${NC}"
+                    ;;
+                2)
+                    read -p "$(echo -e ${YELLOW}Quantas imagens? [padrão: 16]: ${NC})" num_samples
+                    NUM_SAMPLES=${num_samples:-16}
+                    echo ""
+                    echo -e "${GREEN}🎨 Gerando $NUM_SAMPLES imagens: '$class_name'${NC}"
+                    ;;
+                *)
+                    NUM_SAMPLES=1
+                    echo ""
+                    echo -e "${GREEN}🎨 Gerando 1 imagem em alta resolução: '$class_name'${NC}"
+                    ;;
+            esac
+            
             echo ""
             python generate_interactive.py \
                 --checkpoint "$CHECKPOINT_PATH" \
@@ -495,6 +517,152 @@ generate_by_class() {
     
     echo ""
     echo -e "${GREEN}✅ Geração concluída!${NC}"
+    echo ""
+    read -p "Pressione Enter para voltar ao menu..."
+}
+
+# ═══════════════════════════════════════════════════════════════
+# FUNÇÃO: UPSCALE DE IMAGENS
+# ═══════════════════════════════════════════════════════════════
+
+upscale_images() {
+    show_banner
+    echo -e "${BOLD}${PURPLE}📐 UPSCALE DE IMAGENS (AUMENTAR RESOLUÇÃO)${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    
+    echo -e "${CYAN}💡 Sobre Upscaling:${NC}"
+    echo "   Aumenta a resolução de imagens geradas usando algoritmos avançados"
+    echo "   Exemplo: 28x28 → 224x224 (8x maior)"
+    echo ""
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    
+    # Listar imagens geradas disponíveis
+    echo -e "${BOLD}Imagens geradas disponíveis:${NC}"
+    echo ""
+    
+    IMAGES=()
+    COUNT=0
+    
+    if [ -d "outputs" ]; then
+        while IFS= read -r -d '' img; do
+            COUNT=$((COUNT + 1))
+            IMAGES+=("$img")
+            SIZE=$(identify -format "%wx%h" "$img" 2>/dev/null || echo "desconhecido")
+            FILESIZE=$(du -h "$img" | cut -f1)
+            echo -e "  ${GREEN}$COUNT)${NC} $(basename "$img")"
+            echo -e "      ${CYAN}Caminho: $img${NC}"
+            echo -e "      ${CYAN}Tamanho: $SIZE | Arquivo: $FILESIZE${NC}"
+            echo ""
+        done < <(find outputs -name "*.png" -o -name "*.jpg" -print0 | sort -z)
+    fi
+    
+    if [ $COUNT -eq 0 ]; then
+        echo -e "${YELLOW}📭 Nenhuma imagem encontrada.${NC}"
+        echo ""
+        echo -e "${CYAN}💡 Gere imagens primeiro (opção 3 ou 4)!${NC}"
+        echo ""
+        read -p "Pressione Enter para voltar..."
+        return
+    fi
+    
+    echo -e "  ${GREEN}0)${NC} 🔙 Voltar ao menu"
+    echo ""
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    
+    read -p "$(echo -e ${YELLOW}Escolha a imagem [0-$COUNT]: ${NC})" img_choice
+    
+    if [ "$img_choice" = "0" ]; then
+        return
+    fi
+    
+    if [ "$img_choice" -lt 1 ] || [ "$img_choice" -gt $COUNT ]; then
+        echo -e "${RED}Opção inválida!${NC}"
+        sleep 2
+        return
+    fi
+    
+    SELECTED_IMAGE="${IMAGES[$((img_choice - 1))]}"
+    
+    echo ""
+    echo -e "${BOLD}Imagem selecionada:${NC} $(basename "$SELECTED_IMAGE")"
+    echo ""
+    
+    # Escolher método de upscale
+    echo -e "${BOLD}Escolha o método de upscaling:${NC}"
+    echo ""
+    echo -e "  ${GREEN}1)${NC} Bicubic  ${CYAN}(rápido, boa qualidade)${NC} ${YELLOW}← Recomendado${NC}"
+    echo -e "  ${GREEN}2)${NC} Lanczos  ${CYAN}(melhor qualidade, um pouco mais lento)${NC}"
+    echo -e "  ${GREEN}3)${NC} Nearest  ${CYAN}(pixel-art, estilo retro)${NC}"
+    echo -e "  ${GREEN}4)${NC} ESRGAN   ${CYAN}(super-resolução AI - requer instalação extra)${NC}"
+    echo ""
+    read -p "$(echo -e ${YELLOW}Método [1-4]: ${NC})" method_choice
+    
+    case $method_choice in
+        1) METHOD="bicubic" ;;
+        2) METHOD="lanczos" ;;
+        3) METHOD="nearest" ;;
+        4) METHOD="esrgan" ;;
+        *) 
+            echo -e "${RED}Opção inválida! Usando bicubic.${NC}"
+            METHOD="bicubic"
+            ;;
+    esac
+    
+    # Escolher escala
+    echo ""
+    echo -e "${BOLD}Fator de escala:${NC}"
+    echo ""
+    echo -e "  ${CYAN}Sugestões por dataset:${NC}"
+    echo -e "    MNIST/Fashion-MNIST (28x28):  ${GREEN}8x${NC} = 224x224 (web/redes sociais)"
+    echo -e "    MNIST/Fashion-MNIST (28x28): ${GREEN}10x${NC} = 280x280 (Instagram)"
+    echo -e "    CIFAR-10 (32x32):             ${GREEN}8x${NC} = 256x256 (web)"
+    echo -e "    CIFAR-10 (32x32):            ${GREEN}16x${NC} = 512x512 (impressão)"
+    echo ""
+    read -p "$(echo -e ${YELLOW}Digite a escala [2-16]: ${NC})" scale
+    
+    # Validar escala
+    if ! [[ "$scale" =~ ^[0-9]+$ ]] || [ "$scale" -lt 2 ] || [ "$scale" -gt 16 ]; then
+        echo -e "${RED}Escala inválida! Usando 8x.${NC}"
+        scale=8
+    fi
+    
+    # Perguntar sobre melhorias
+    echo ""
+    echo -e "${BOLD}Aplicar melhorias de qualidade?${NC}"
+    echo ""
+    read -p "$(echo -e ${YELLOW}Aumentar nitidez? [s/N]: ${NC})" sharpen_choice
+    read -p "$(echo -e ${YELLOW}Melhorar contraste? [s/N]: ${NC})" contrast_choice
+    
+    # Construir comando
+    CMD="python scripts/upscale_images.py --input \"$SELECTED_IMAGE\" --scale $scale --method $METHOD"
+    
+    if [[ "$sharpen_choice" =~ ^[Ss]$ ]]; then
+        CMD="$CMD --sharpen 1.6"
+    fi
+    
+    if [[ "$contrast_choice" =~ ^[Ss]$ ]]; then
+        CMD="$CMD --contrast 1.2"
+    fi
+    
+    # Executar upscale
+    echo ""
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}🚀 Executando upscale...${NC}"
+    echo ""
+    echo -e "${CYAN}Comando: $CMD${NC}"
+    echo ""
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    
+    eval $CMD
+    
+    echo ""
+    echo -e "${GREEN}✅ Upscale concluído!${NC}"
+    echo ""
+    echo -e "${CYAN}💡 Dica: O arquivo foi salvo com sufixo '_upscaled_${scale}x'${NC}"
     echo ""
     read -p "Pressione Enter para voltar ao menu..."
 }
@@ -724,10 +892,11 @@ main() {
             2) quick_examples ;;
             3) generate_images ;;
             4) generate_by_class ;;
-            5) show_status ;;
-            6) list_datasets ;;
-            7) list_models ;;
-            8) show_help ;;
+            5) upscale_images ;;
+            6) show_status ;;
+            7) list_datasets ;;
+            8) list_models ;;
+            9) show_help ;;
             0) 
                 echo ""
                 echo -e "${GREEN}${BOLD}Até logo! 👋${NC}"
