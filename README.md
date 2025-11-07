@@ -57,6 +57,7 @@ python generate.py --checkpoint outputs/cifar10/dcgan_xxx/checkpoints/checkpoint
 | **Custom**        | Suas próprias imagens    | 📁 Suas imagens | Variável |
 
 ### Ver todos os datasets
+
 ```bash
 python train.py --list-datasets
 ```
@@ -69,6 +70,7 @@ python train.py --list-datasets
 | **WGAN-GP** | Wasserstein GAN + Gradient Penalty | 🐢 Lento    | ⭐⭐⭐⭐⭐ Excelente |
 
 ### Ver todos os modelos
+
 ```bash
 python train.py --list-models
 ```
@@ -76,31 +78,37 @@ python train.py --list-models
 ## 💡 Exemplos de Uso
 
 ### Exemplo 1: Treinamento Básico
+
 ```bash
 python train.py --dataset cifar10 --model dcgan --epochs 50
 ```
 
 ### Exemplo 2: Alta Qualidade (requer mais tempo)
+
 ```bash
 python train.py --dataset cifar10 --model wgan-gp --epochs 200 --batch-size 64
 ```
 
 ### Exemplo 3: Teste Rápido
+
 ```bash
 python train.py --dataset mnist --model dcgan --epochs 5
 ```
 
 ### Exemplo 4: Imagens de Alta Resolução
+
 ```bash
 python train.py --dataset celeba --model dcgan --img-size 128 --ngf 128 --ndf 128 --epochs 100
 ```
 
 ### Exemplo 5: GPU com Pouca Memória
+
 ```bash
 python train.py --dataset fashion-mnist --model dcgan --batch-size 32
 ```
 
 ### Exemplo 6: Dataset Customizado
+
 ```bash
 # Organize suas imagens em: data/custom/categoria/
 python train.py --dataset custom --model dcgan --epochs 100
@@ -125,7 +133,7 @@ python train.py \
 
 ## 📂 Estrutura do Projeto
 
-```
+```bash
 projeto-geracao-imagem/
 ├── train.py              # ⭐ Script principal de treinamento
 ├── generate.py           # 🎨 Gerar imagens de modelos treinados
@@ -149,7 +157,7 @@ projeto-geracao-imagem/
 
 Após o treinamento, você terá:
 
-```
+```bash
 outputs/cifar10/dcgan_20240115_143000/
 ├── config.json                    # Configurações usadas
 ├── training.log                   # Log detalhado
@@ -167,15 +175,17 @@ outputs/cifar10/dcgan_20240115_143000/
 
 ## 🎯 Compartilhando Modelos
 
-### Para compartilhar seu modelo treinado:
+### Para compartilhar seu modelo treinado
 
-1. **Compactar checkpoint:**
+#### 1. **Compactar checkpoint:**
+
 ```bash
 cd outputs/cifar10/dcgan_xxx/checkpoints/
 zip meu_modelo.zip checkpoint_latest.pth
 ```
 
-2. **Outras pessoas podem usar:**
+#### 2. **Outras pessoas podem usar:**
+
 ```bash
 # Download do modelo compartilhado
 unzip meu_modelo.zip
@@ -184,7 +194,8 @@ unzip meu_modelo.zip
 python generate.py --checkpoint checkpoint_latest.pth --num-samples 100
 ```
 
-### O checkpoint contém:
+### O checkpoint contém
+
 - ✅ Pesos do gerador
 - ✅ Pesos do discriminador
 - ✅ Estados dos otimizadores
@@ -209,6 +220,7 @@ Para guia detalhado com exemplos, dicas e troubleshooting:
 Depois de treinar seu modelo:
 
 1. **Gerar imagens:**
+
    ```bash
    python generate.py --checkpoint outputs/.../checkpoint_latest.pth
    ```
@@ -226,6 +238,7 @@ Depois de treinar seu modelo:
 ## 🤝 Contribuindo
 
 Contribuições são bem-vindas! Para adicionar:
+
 - Novos datasets: Edite `config.py`
 - Novos modelos: Edite `models.py`
 - Melhorias: Abra um Pull Request
@@ -236,9 +249,9 @@ Open source - Use e modifique livremente!
 
 ## 🎓 Recursos de Aprendizado
 
-- **DCGAN Paper:** https://arxiv.org/abs/1511.06434
-- **WGAN-GP Paper:** https://arxiv.org/abs/1704.00028
-- **PyTorch Tutorials:** https://pytorch.org/tutorials/
+- **DCGAN Paper:** <https://arxiv.org/abs/1511.06434>
+- **WGAN-GP Paper:** <https://arxiv.org/abs/1704.00028>
+- **PyTorch Tutorials:** <https://pytorch.org/tutorials/>
 
 ## ❓ FAQ
 

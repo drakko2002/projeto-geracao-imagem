@@ -5,6 +5,8 @@ local.env
 # Python
 bin/
 venv/
+env/
+ENV/
 
 # Dependências e cache
 compiler_compat/
@@ -12,20 +14,73 @@ conda-meta/
 etc/
 include/
 lib/
+lib64/
 man/
 opt/
 share/
 ssl/
 
-# Modelos e saídas
+# Datasets (muito grandes)
+data/
+*.tar.gz
+*.zip
+*.7z
+
+# Modelos e saídas (muito grandes)
 model/
 models/
 outputs/
+*.pth
+*.pt
+*.ckpt
+
+# Imagens geradas
 *.png
 *.jpg
 *.jpeg
+
+# Exceto imagens de documentação
+!docs/*.png
+!images/*.png
+!README_images/*.png
 
 # Python cache
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs
+*.log
+training.log
+
+# Backup/Temporários
+_old_files/
+backup/
+tmp/
+temp/
+
+# Modelos exemplo (se quiser incluir um modelo pequeno)
+# !pretrained_models/mnist_example.pth
