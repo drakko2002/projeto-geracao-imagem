@@ -21,15 +21,11 @@ class DCGANGenerator(nn.Module):
         self.nc = nc
         self.img_size = img_size
 
-        # Calcular número de camadas baseado no tamanho da imagem
-        # img_size = 64: log2(64)=6, então 6-2=4 camadas totais de upsampling
-        # 4x4 -> 8x8 -> 16x16 -> 32x32 -> 64x64 (4 upsampling layers)
         num_layers = int(torch.log2(torch.tensor(img_size))) - 2
 
         layers = []
-
-        # Camada inicial: transforma vetor z (nz x 1 x 1) em feature map 4x4
         current_dim = ngf * (2 ** (num_layers - 1))
+
         layers.extend(
             [
                 nn.ConvTranspose2d(nz, current_dim, 4, 1, 0, bias=False),
@@ -38,7 +34,6 @@ class DCGANGenerator(nn.Module):
             ]
         )
 
-        # Camadas de upsampling intermediárias (num_layers - 1 camadas)
         for i in range(num_layers - 1):
             next_dim = current_dim // 2
             layers.extend(
@@ -50,9 +45,11 @@ class DCGANGenerator(nn.Module):
             )
             current_dim = next_dim
 
-        # Camada final: última upsampling + mudança para nc canais
         layers.extend(
-            [nn.ConvTranspose2d(current_dim, nc, 4, 2, 1, bias=False), nn.Tanh()]
+            [
+                nn.ConvTranspose2d(current_dim, nc, 4, 2, 1, bias=False),
+                nn.Tanh(),
+            ]
         )
 
         self.main = nn.Sequential(*layers)
@@ -70,18 +67,17 @@ class DCGANDiscriminator(nn.Module):
         self.nc = nc
         self.img_size = img_size
 
-        # Calcular número de camadas (deve ser simétrico ao gerador)
-        # Para img_size=64: log2(64)=6, então 6-3=3 camadas intermediárias
         num_layers = int(torch.log2(torch.tensor(img_size))) - 3
 
         layers = []
 
-        # Camada inicial: 64x64 -> 32x32
         layers.extend(
-            [nn.Conv2d(nc, ndf, 4, 2, 1, bias=False), nn.LeakyReLU(0.2, inplace=True)]
+            [
+                nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
+                nn.LeakyReLU(0.2, inplace=True),
+            ]
         )
 
-        # Camadas intermediárias de downsampling
         current_dim = ndf
         for i in range(num_layers):
             next_dim = current_dim * 2
@@ -94,8 +90,12 @@ class DCGANDiscriminator(nn.Module):
             )
             current_dim = next_dim
 
-        # Camada final: reduz para 1x1 e classifica como real (1) ou fake (0)
-        layers.extend([nn.Conv2d(current_dim, 1, 4, 1, 0, bias=False), nn.Sigmoid()])
+        layers.extend(
+            [
+                nn.Conv2d(current_dim, 1, 4, 1, 0, bias=False),
+                nn.Sigmoid(),
+            ]
+        )
 
         self.main = nn.Sequential(*layers)
 
@@ -104,7 +104,119 @@ class DCGANDiscriminator(nn.Module):
 
 
 # ====================================================================================
-# WGAN-GP (Wasserstein GAN with Gradient Penalty)
+# DCGAN CONDICIONAL (label → imagem)
+# ====================================================================================
+
+
+class ConditionalDCGANGenerator(nn.Module):
+    """
+    DCGAN condicional simples.
+    Usa embedding de classe para condicionar o ruído.
+    """
+
+    def __init__(self, nz=100, ngf=64, nc=3, img_size=64, num_classes=10):
+        super().__init__()
+        self.nz = nz
+        self.num_classes = num_classes
+        self.label_emb = nn.Embedding(num_classes, nz)
+
+        num_layers = int(torch.log2(torch.tensor(img_size))) - 2
+        layers = []
+        current_dim = ngf * (2 ** (num_layers - 1))
+
+        # Entrada continua sendo (nz x 1 x 1), mas já "contaminado" pelo label
+        layers.extend(
+            [
+                nn.ConvTranspose2d(nz, current_dim, 4, 1, 0, bias=False),
+                nn.BatchNorm2d(current_dim),
+                nn.ReLU(True),
+            ]
+        )
+
+        for i in range(num_layers - 1):
+            next_dim = current_dim // 2
+            layers.extend(
+                [
+                    nn.ConvTranspose2d(current_dim, next_dim, 4, 2, 1, bias=False),
+                    nn.BatchNorm2d(next_dim),
+                    nn.ReLU(True),
+                ]
+            )
+            current_dim = next_dim
+
+        layers.extend(
+            [
+                nn.ConvTranspose2d(current_dim, nc, 4, 2, 1, bias=False),
+                nn.Tanh(),
+            ]
+        )
+
+        self.main = nn.Sequential(*layers)
+
+    def forward(self, noise, labels):
+        # labels: (B,)
+        emb = self.label_emb(labels).unsqueeze(2).unsqueeze(3)  # (B, nz, 1, 1)
+        z = noise + emb
+        return self.main(z)
+
+
+class ConditionalDCGANDiscriminator(nn.Module):
+    """
+    Discriminador condicional:
+    concatena um mapa derivado do label como canal extra.
+    """
+
+    def __init__(self, ndf=64, nc=3, img_size=64, num_classes=10):
+        super().__init__()
+        self.ndf = ndf
+        self.nc = nc
+        self.img_size = img_size
+        self.num_classes = num_classes
+
+        # Cada classe vira um mapa (H*W) que será reshape para (1,H,W)
+        self.label_emb = nn.Embedding(num_classes, img_size * img_size)
+
+        num_layers = int(torch.log2(torch.tensor(img_size))) - 3
+        in_channels = nc + 1  # imagem + canal de condição
+
+        layers = []
+        layers.extend(
+            [
+                nn.Conv2d(in_channels, ndf, 4, 2, 1, bias=False),
+                nn.LeakyReLU(0.2, inplace=True),
+            ]
+        )
+
+        current_dim = ndf
+        for i in range(num_layers):
+            next_dim = current_dim * 2
+            layers.extend(
+                [
+                    nn.Conv2d(current_dim, next_dim, 4, 2, 1, bias=False),
+                    nn.BatchNorm2d(next_dim),
+                    nn.LeakyReLU(0.2, inplace=True),
+                ]
+            )
+            current_dim = next_dim
+
+        layers.extend(
+            [
+                nn.Conv2d(current_dim, 1, 4, 1, 0, bias=False),
+                nn.Sigmoid(),
+            ]
+        )
+
+        self.main = nn.Sequential(*layers)
+
+    def forward(self, img, labels):
+        b = img.size(0)
+        cond = self.label_emb(labels).view(b, 1, self.img_size, self.img_size)
+        x = torch.cat([img, cond], dim=1)
+        return self.main(x).view(-1, 1).squeeze(1)
+
+
+# ====================================================================================
+# WGAN-GP
 # ====================================================================================
 
 
@@ -118,13 +230,11 @@ class WGANGenerator(nn.Module):
         self.nc = nc
         self.img_size = img_size
 
-        # Mesmo cálculo que DCGAN
         num_layers = int(torch.log2(torch.tensor(img_size))) - 2
 
         layers = []
         current_dim = ngf * (2 ** (num_layers - 1))
 
-        # Camada inicial
         layers.extend(
             [
                 nn.ConvTranspose2d(nz, current_dim, 4, 1, 0, bias=False),
@@ -133,7 +243,6 @@ class WGANGenerator(nn.Module):
             ]
         )
 
-        # Camadas intermediárias
         for i in range(num_layers - 1):
             next_dim = current_dim // 2
             layers.extend(
@@ -145,9 +254,11 @@ class WGANGenerator(nn.Module):
             )
             current_dim = next_dim
 
-        # Camada final
         layers.extend(
-            [nn.ConvTranspose2d(current_dim, nc, 4, 2, 1, bias=False), nn.Tanh()]
+            [
+                nn.ConvTranspose2d(current_dim, nc, 4, 2, 1, bias=False),
+                nn.Tanh(),
+            ]
         )
 
         self.main = nn.Sequential(*layers)
@@ -157,7 +268,7 @@ class WGANGenerator(nn.Module):
 
 
 class WGANCritic(nn.Module):
-    """Crítico para WGAN-GP (sem sigmoid, retorna score real)"""
+    """Crítico para WGAN-GP"""
 
     def __init__(self, ndf=64, nc=3, img_size=64):
         super(WGANCritic, self).__init__()
@@ -165,17 +276,17 @@ class WGANCritic(nn.Module):
         self.nc = nc
         self.img_size = img_size
 
-        # Mesmo cálculo que o discriminador DCGAN
         num_layers = int(torch.log2(torch.tensor(img_size))) - 3
 
         layers = []
 
-        # Camada inicial (sem BatchNorm para WGAN-GP)
         layers.extend(
-            [nn.Conv2d(nc, ndf, 4, 2, 1, bias=True), nn.LeakyReLU(0.2, inplace=True)]
+            [
+                nn.Conv2d(nc, ndf, 4, 2, 1, bias=True),
+                nn.LeakyReLU(0.2, inplace=True),
+            ]
         )
 
-        # Camadas intermediárias (sem BatchNorm/LayerNorm para estabilidade WGAN-GP)
         current_dim = ndf
         for i in range(num_layers):
             next_dim = current_dim * 2
@@ -187,7 +298,6 @@ class WGANCritic(nn.Module):
             )
             current_dim = next_dim
 
-        # Camada final (sem sigmoid - retorna score Wasserstein)
         layers.append(nn.Conv2d(current_dim, 1, 4, 1, 0, bias=True))
 
         self.main = nn.Sequential(*layers)
@@ -197,12 +307,11 @@ class WGANCritic(nn.Module):
 
 
 # ====================================================================================
-# Funções auxiliares
+# Helpers
 # ====================================================================================
 
 
 def weights_init(m):
-    """Inicialização de pesos conforme paper DCGAN"""
     classname = m.__class__.__name__
     if classname.find("Conv") != -1:
         nn.init.normal_(m.weight.data, 0.0, 0.02)
@@ -213,14 +322,7 @@ def weights_init(m):
 
 def get_model(model_type, model_config):
     """
-    Factory function para criar modelos
-
-    Args:
-        model_type: 'dcgan' ou 'wgan-gp'
-        model_config: dicionário com configurações do modelo
-
-    Returns:
-        (generator, discriminator/critic)
+    Factory: 'dcgan', 'wgan-gp', 'dcgan-cond'
     """
     nz = model_config.get("nz", 100)
     ngf = model_config.get("ngf", 64)
@@ -228,32 +330,41 @@ def get_model(model_type, model_config):
     nc = model_config.get("nc", 3)
     img_size = model_config.get("img_size", 64)
 
-    if model_type.lower() == "dcgan":
+    mt = model_type.lower()
+
+    if mt == "dcgan":
         generator = DCGANGenerator(nz=nz, ngf=ngf, nc=nc, img_size=img_size)
         discriminator = DCGANDiscriminator(ndf=ndf, nc=nc, img_size=img_size)
-
-        # Inicializar pesos
         generator.apply(weights_init)
         discriminator.apply(weights_init)
-
         return generator, discriminator
 
-    elif model_type.lower() == "wgan-gp":
+    elif mt in ("dcgan-cond", "dcgan_cond", "cgan"):
+        num_classes = model_config.get("num_classes")
+        if num_classes is None:
+            raise ValueError("num_classes é obrigatório para dcgan-cond")
+        generator = ConditionalDCGANGenerator(
+            nz=nz, ngf=ngf, nc=nc, img_size=img_size, num_classes=num_classes
+        )
+        discriminator = ConditionalDCGANDiscriminator(
+            ndf=ndf, nc=nc, img_size=img_size, num_classes=num_classes
+        )
+        generator.apply(weights_init)
+        discriminator.apply(weights_init)
+        return generator, discriminator
+
+    elif mt == "wgan-gp":
         generator = WGANGenerator(nz=nz, ngf=ngf, nc=nc, img_size=img_size)
         critic = WGANCritic(ndf=ndf, nc=nc, img_size=img_size)
-
-        # Inicializar pesos
         generator.apply(weights_init)
         critic.apply(weights_init)
-
         return generator, critic
 
     else:
         raise ValueError(
-            f"Modelo '{model_type}' não suportado. Use 'dcgan' ou 'wgan-gp'"
+            f"Modelo '{model_type}' não suportado. Use 'dcgan', 'dcgan-cond' ou 'wgan-gp'"
         )
 
 
 def count_parameters(model):
-    """Conta número de parâmetros treináveis no modelo"""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)

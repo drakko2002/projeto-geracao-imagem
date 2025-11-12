@@ -6,6 +6,7 @@ Suporta múltiplos datasets e arquiteturas
 Uso:
     python train.py --dataset cifar10 --model dcgan --epochs 50
     python train.py --dataset fashion-mnist --model wgan-gp --epochs 100
+    python train.py --dataset mnist --model dcgan-cond --epochs 50
     python train.py --list-datasets  # Lista datasets disponíveis
     python train.py --list-models    # Lista modelos disponíveis
 """
@@ -18,6 +19,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import grad
+import torchvision.utils as vutils
 
 from config import (
     get_dataset,
@@ -25,9 +27,9 @@ from config import (
     get_model_config,
     list_available_datasets,
     list_available_models,
+    DATASET_CONFIGS,   # << usado para saber num_classes por dataset
 )
 
-# Importar módulos do projeto
 from models import get_model
 from utils import (
     TrainingLogger,
@@ -49,47 +51,57 @@ from utils import (
 
 def train_dcgan(generator, discriminator, dataloader, device, config, output_dir):
     """
-    Treinamento DCGAN padrão
+    Treinamento DCGAN padrão OU condicional (dcgan-cond)
 
-    Args:
-        generator: modelo do gerador
-        discriminator: modelo do discriminador
-        dataloader: dataloader do dataset
-        device: dispositivo (CPU/GPU)
-        config: configurações de treinamento
-        output_dir: diretório de saída
+    Se config["is_conditional"] = True:
+        - Usa labels do dataset (data[1])
+        - Usa gerador/discriminador condicionais (dcgan-cond)
+        - Prompt / GUI podem mapear texto -> classe depois
     """
 
-    # Configurações
+    # Configurações comuns
     epochs = config["epochs"]
     lr = config["lr"]
     beta1 = config["beta1"]
     nz = config["nz"]
+
+    # Flags para condicional
+    is_conditional = config.get("is_conditional", False)
+    num_classes = config.get("num_classes", None)
+
+    if is_conditional and num_classes is None:
+        raise ValueError("Treino condicional requer 'num_classes' em config.")
 
     # Critério e otimizadores
     criterion = nn.BCELoss()
     optimizerD = optim.Adam(discriminator.parameters(), lr=lr, betas=(beta1, 0.999))
     optimizerG = optim.Adam(generator.parameters(), lr=lr, betas=(beta1, 0.999))
 
-    # Labels reais e fake
     real_label = 1.0
     fake_label = 0.0
 
-    # Ruído fixo para visualização
     fixed_noise = torch.randn(64, nz, 1, 1, device=device)
 
-    # Histórico de perdas
-    losses = {"G": [], "D": []}
+    # Se condicional, gera labels fixos p/ visualização (ciclo sobre classes)
+    if is_conditional:
+        fixed_labels = torch.arange(0, num_classes, device=device)
+        # repete até 64
+        fixed_labels = fixed_labels.repeat((64 + num_classes - 1) // num_classes)[:64]
+    else:
+        fixed_labels = None
 
-    # Logger
+    losses = {"G": [], "D": []}
     logger = TrainingLogger(output_dir)
-    logger.log(f"Iniciando treinamento DCGAN")
+
+    logger.log(
+        f"Iniciando treinamento {'DCGAN Condicional' if is_conditional else 'DCGAN'}"
+    )
     logger.log(
         f"Dataset: {config['dataset']} | Épocas: {epochs} | Batch size: {config['batch_size']}"
     )
 
     print("\n" + "=" * 70)
-    print("INICIANDO TREINAMENTO")
+    print("INICIANDO TREINAMENTO", "CONDICIONAL" if is_conditional else "")
     print("=" * 70)
 
     start_time = time.time()
@@ -98,76 +110,126 @@ def train_dcgan(generator, discriminator, dataloader, device, config, output_dir
         epoch_start = time.time()
 
         for i, data in enumerate(dataloader):
+            # ------------------------------------------------
+            # Preparar batch real
+            # ------------------------------------------------
+            if is_conditional:
+                real_data, labels = data[0].to(device), data[1].to(device)
+            else:
+                real_data = data[0].to(device)
+                labels = None  # não usado
+
+            batch_size = real_data.size(0)
+
             ############################
-            # (1) Atualizar Discriminador: maximizar log(D(x)) + log(1 - D(G(z)))
+            # (1) Atualizar D
             ############################
             discriminator.zero_grad()
 
-            # Treinar com batch real
-            real_data = data[0].to(device)
-            batch_size = real_data.size(0)
-            label = torch.full(
+            # --- Real ---
+            label_real_tensor = torch.full(
                 (batch_size,), real_label, dtype=torch.float, device=device
             )
 
-            output = discriminator(real_data).view(-1)
-            errD_real = criterion(output, label)
+            if is_conditional:
+                output_real = discriminator(real_data, labels).view(-1)
+            else:
+                output_real = discriminator(real_data).view(-1)
+
+            errD_real = criterion(output_real, label_real_tensor)
             errD_real.backward()
-            D_x = output.mean().item()
+            D_x = output_real.mean().item()
 
-            # Treinar com batch fake
+            # --- Fake ---
             noise = torch.randn(batch_size, nz, 1, 1, device=device)
-            fake = generator(noise)
-            label.fill_(fake_label)
 
-            output = discriminator(fake.detach()).view(-1)
-            errD_fake = criterion(output, label)
+            if is_conditional:
+                # amostra rótulos aleatórios para fakes
+                fake_labels = torch.randint(0, num_classes, (batch_size,), device=device)
+                fake = generator(noise, fake_labels)
+                output_fake = discriminator(fake.detach(), fake_labels).view(-1)
+            else:
+                fake = generator(noise)
+                output_fake = discriminator(fake.detach()).view(-1)
+
+            label_fake_tensor = torch.full(
+                (batch_size,), fake_label, dtype=torch.float, device=device
+            )
+            errD_fake = criterion(output_fake, label_fake_tensor)
             errD_fake.backward()
-            D_G_z1 = output.mean().item()
+            D_G_z1 = output_fake.mean().item()
 
             errD = errD_real + errD_fake
             optimizerD.step()
 
             ############################
-            # (2) Atualizar Gerador: maximizar log(D(G(z)))
+            # (2) Atualizar G
             ############################
             generator.zero_grad()
-            label.fill_(real_label)
+            label_gen_tensor = torch.full(
+                (batch_size,), real_label, dtype=torch.float, device=device
+            )
 
-            output = discriminator(fake).view(-1)
-            errG = criterion(output, label)
+            noise = torch.randn(batch_size, nz, 1, 1, device=device)
+
+            if is_conditional:
+                gen_labels = torch.randint(0, num_classes, (batch_size,), device=device)
+                fake = generator(noise, gen_labels)
+                output = discriminator(fake, gen_labels).view(-1)
+            else:
+                fake = generator(noise)
+                output = discriminator(fake).view(-1)
+
+            errG = criterion(output, label_gen_tensor)
             errG.backward()
             D_G_z2 = output.mean().item()
-
             optimizerG.step()
 
-            # Salvar perdas
             losses["G"].append(errG.item())
             losses["D"].append(errD.item())
 
-            # Log de progresso
             if i % 50 == 0:
                 print(
-                    f"[{epoch}/{epochs}][{i}/{len(dataloader)}] "
+                    f"[{epoch+1}/{epochs}][{i}/{len(dataloader)}] "
                     f"Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f} "
                     f"D(x): {D_x:.4f} D(G(z)): {D_G_z1:.4f}/{D_G_z2:.4f}"
                 )
 
-        # Fim da época
+        # ---------------- Fim da época ----------------
         epoch_time = time.time() - epoch_start
         elapsed_total = time.time() - start_time
 
         logger.log_epoch(epoch + 1, epochs, errG.item(), errD.item(), epoch_time)
 
-        # Gerar amostras
+        # Amostras
         if (epoch + 1) % 5 == 0 or epoch == 0:
-            sample_path = os.path.join(output_dir, "samples", f"epoch_{epoch+1}.png")
-            generate_samples(generator, 64, nz, device, sample_path)
+            samples_dir = os.path.join(output_dir, "samples")
+            os.makedirs(samples_dir, exist_ok=True)
+            sample_path = os.path.join(samples_dir, f"epoch_{epoch+1}.png")
+
+            if is_conditional and fixed_labels is not None:
+                # Modelos condicionais: gera usando labels fixos (0..num_classes-1 repetidos)
+                with torch.no_grad():
+                    fake_samples = generator(fixed_noise, fixed_labels).detach().cpu()
+                # saída do gerador está em [-1, 1] -> normaliza pra [0, 1]
+                fake_samples = (fake_samples + 1) / 2
+                vutils.save_image(
+                    fake_samples,
+                    sample_path,
+                    nrow=8,
+                )
+            else:
+                # Modelos não-condicionais usam o helper padrão
+                generate_samples(generator, 64, nz, device, sample_path)
+
             print(f"✓ Amostras salvas: {sample_path}")
 
-        # Salvar checkpoint
+
+        # Checkpoints
         if (epoch + 1) % 10 == 0 or epoch == epochs - 1:
             checkpoint_dir = os.path.join(output_dir, "checkpoints")
+            os.makedirs(checkpoint_dir, exist_ok=True)
+
             save_checkpoint(
                 generator,
                 discriminator,
@@ -179,20 +241,26 @@ def train_dcgan(generator, discriminator, dataloader, device, config, output_dir
                 checkpoint_dir,
             )
 
-        # Estimativa de tempo restante
         remaining = estimate_remaining_time(elapsed_total, epoch + 1, epochs)
         print(f"⏱️  Tempo restante estimado: {remaining}\n")
 
-    # Treinamento concluído
     total_time = time.time() - start_time
-    logger.log(f"\n✅ Treinamento concluído em {format_time(total_time)}")
+    logger.log(f"\n Treinamento concluído em {format_time(total_time)}")
 
-    # Plotar perdas
     plot_losses(losses, output_dir)
 
-    # Gerar amostras finais
     final_sample_path = os.path.join(output_dir, "final_samples.png")
-    generate_samples(generator, 64, nz, device, final_sample_path)
+    if is_conditional and fixed_labels is not None:
+        with torch.no_grad():
+            fake_samples = generator(fixed_noise, fixed_labels).detach().cpu()
+        fake_samples = (fake_samples + 1) / 2  # [-1,1] -> [0,1]
+        vutils.save_image(
+            fake_samples,
+            final_sample_path,
+            nrow=8,
+        )
+    else:
+        generate_samples(generator, 64, nz, device, final_sample_path)
 
     print("\n" + "=" * 70)
     print("TREINAMENTO CONCLUÍDO!")
@@ -202,20 +270,16 @@ def train_dcgan(generator, discriminator, dataloader, device, config, output_dir
     print("=" * 70 + "\n")
 
 
+
 def compute_gradient_penalty(critic, real_data, fake_data, device):
     """Calcula gradient penalty para WGAN-GP"""
     batch_size = real_data.size(0)
 
-    # Gerar alpha aleatório
     alpha = torch.rand(batch_size, 1, 1, 1, device=device)
-
-    # Interpolar entre dados reais e fake
     interpolates = (alpha * real_data + (1 - alpha) * fake_data).requires_grad_(True)
 
-    # Calcular output do critic
     d_interpolates = critic(interpolates)
 
-    # Calcular gradientes
     fake = torch.ones(d_interpolates.size(), device=device, requires_grad=False)
 
     gradients = grad(
@@ -235,18 +299,9 @@ def compute_gradient_penalty(critic, real_data, fake_data, device):
 
 def train_wgan_gp(generator, critic, dataloader, device, config, output_dir):
     """
-    Treinamento WGAN-GP (Wasserstein GAN with Gradient Penalty)
-
-    Args:
-        generator: modelo do gerador
-        critic: modelo do critic
-        dataloader: dataloader do dataset
-        device: dispositivo (CPU/GPU)
-        config: configurações de treinamento
-        output_dir: diretório de saída
+    Treinamento WGAN-GP (sem condicionamento)
     """
 
-    # Configurações
     epochs = config["epochs"]
     lr = config["lr"]
     beta1 = config["beta1"]
@@ -254,18 +309,14 @@ def train_wgan_gp(generator, critic, dataloader, device, config, output_dir):
     n_critic = config.get("n_critic", 5)
     lambda_gp = config.get("lambda_gp", 10.0)
 
-    # Otimizadores
     optimizerD = optim.Adam(critic.parameters(), lr=lr, betas=(beta1, 0.999))
     optimizerG = optim.Adam(generator.parameters(), lr=lr, betas=(beta1, 0.999))
 
-    # Ruído fixo para visualização
     fixed_noise = torch.randn(64, nz, 1, 1, device=device)
 
-    # Histórico de perdas
     losses = {"G": [], "D": []}
-
-    # Logger
     logger = TrainingLogger(output_dir)
+
     logger.log(f"Iniciando treinamento WGAN-GP")
     logger.log(
         f"Dataset: {config['dataset']} | Épocas: {epochs} | Batch size: {config['batch_size']}"
@@ -285,70 +336,73 @@ def train_wgan_gp(generator, critic, dataloader, device, config, output_dir):
             real_data = data[0].to(device)
             batch_size = real_data.size(0)
 
-            ############################
-            # (1) Atualizar Critic: minimizar -E[D(x)] + E[D(G(z))] + lambda * GP
-            ############################
+            # (1) Atualizar Critic n_critic vezes
             for _ in range(n_critic):
                 critic.zero_grad()
 
-                # Critic score para dados reais
                 critic_real = critic(real_data).mean()
 
-                # Critic score para dados fake
                 noise = torch.randn(batch_size, nz, 1, 1, device=device)
                 fake = generator(noise)
                 critic_fake = critic(fake.detach()).mean()
 
-                # Gradient penalty
                 gradient_penalty = compute_gradient_penalty(
                     critic, real_data, fake, device
                 )
 
-                # Perda do critic (Wasserstein distance + gradient penalty)
                 errD = -critic_real + critic_fake + lambda_gp * gradient_penalty
                 errD.backward()
                 optimizerD.step()
 
-            ############################
-            # (2) Atualizar Gerador: minimizar -E[D(G(z))]
-            ############################
+            # (2) Atualizar Gerador
             generator.zero_grad()
-
             noise = torch.randn(batch_size, nz, 1, 1, device=device)
             fake = generator(noise)
             critic_fake = critic(fake).mean()
-
             errG = -critic_fake
             errG.backward()
             optimizerG.step()
 
-            # Salvar perdas
             losses["G"].append(errG.item())
             losses["D"].append(errD.item())
 
-            # Log de progresso
             if i % 50 == 0:
                 print(
-                    f"[{epoch}/{epochs}][{i}/{len(dataloader)}] "
+                    f"[{epoch+1}/{epochs}][{i}/{len(dataloader)}] "
                     f"Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f} "
                     f"D(x): {critic_real.item():.4f} D(G(z)): {critic_fake.item():.4f}"
                 )
 
-        # Fim da época
         epoch_time = time.time() - epoch_start
         elapsed_total = time.time() - start_time
 
-        logger.log_epoch(epoch + 1, epochs, errG.item(), errD.item(), epoch_time)
-
-        # Gerar amostras
+                # Amostras
         if (epoch + 1) % 5 == 0 or epoch == 0:
-            sample_path = os.path.join(output_dir, "samples", f"epoch_{epoch+1}.png")
-            generate_samples(generator, 64, nz, device, sample_path)
+            samples_dir = os.path.join(output_dir, "samples")
+            os.makedirs(samples_dir, exist_ok=True)
+            sample_path = os.path.join(samples_dir, f"epoch_{epoch+1}.png")
+
+            if is_conditional and fixed_labels is not None:
+                # Modelos condicionais: gerar manualmente com labels fixos
+                with torch.no_grad():
+                    fake_samples = generator(fixed_noise, fixed_labels).detach().cpu()
+                # [-1, 1] -> [0, 1]
+                fake_samples = (fake_samples + 1) / 2
+                vutils.save_image(
+                    fake_samples,
+                    sample_path,
+                    nrow=8,
+                )
+            else:
+                # Modelos não condicionais usam o helper existente
+                generate_samples(generator, 64, nz, device, sample_path)
+
             print(f"✓ Amostras salvas: {sample_path}")
 
-        # Salvar checkpoint
+        # Checkpoints
         if (epoch + 1) % 10 == 0 or epoch == epochs - 1:
             checkpoint_dir = os.path.join(output_dir, "checkpoints")
+            os.makedirs(checkpoint_dir, exist_ok=True)
             save_checkpoint(
                 generator,
                 critic,
@@ -360,18 +414,14 @@ def train_wgan_gp(generator, critic, dataloader, device, config, output_dir):
                 checkpoint_dir,
             )
 
-        # Estimativa de tempo restante
         remaining = estimate_remaining_time(elapsed_total, epoch + 1, epochs)
         print(f"⏱️  Tempo restante estimado: {remaining}\n")
 
-    # Treinamento concluído
     total_time = time.time() - start_time
-    logger.log(f"\n✅ Treinamento concluído em {format_time(total_time)}")
+    logger.log(f"\n Treinamento concluído em {format_time(total_time)}")
 
-    # Plotar perdas
     plot_losses(losses, output_dir)
 
-    # Gerar amostras finais
     final_sample_path = os.path.join(output_dir, "final_samples.png")
     generate_samples(generator, 64, nz, device, final_sample_path)
 
@@ -396,7 +446,7 @@ def main():
 Exemplos de uso:
   python train.py --dataset cifar10 --model dcgan --epochs 50
   python train.py --dataset fashion-mnist --model wgan-gp --epochs 100 --batch-size 64
-  python train.py --dataset mnist --model dcgan --img-size 32 --epochs 25
+  python train.py --dataset mnist --model dcgan-cond --epochs 25
   python train.py --list-datasets
   python train.py --list-models
         """,
@@ -410,19 +460,16 @@ Exemplos de uso:
         help="Dataset para treinamento",
     )
     parser.add_argument(
-        "--model", type=str, choices=["dcgan", "wgan-gp"], help="Tipo de modelo GAN"
+        "--model",
+        type=str,
+        choices=["dcgan", "dcgan-cond", "wgan-gp"],
+        help="Tipo de modelo GAN",
     )
 
     # Configurações de treinamento
-    parser.add_argument(
-        "--epochs", type=int, default=50, help="Número de épocas (padrão: 50)"
-    )
-    parser.add_argument(
-        "--batch-size", type=int, default=128, help="Tamanho do batch (padrão: 128)"
-    )
-    parser.add_argument(
-        "--img-size", type=int, default=64, help="Tamanho das imagens (padrão: 64)"
-    )
+    parser.add_argument("--epochs", type=int, default=50)
+    parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument("--img-size", type=int, default=64)
     parser.add_argument(
         "--lr",
         type=float,
@@ -437,68 +484,24 @@ Exemplos de uso:
     )
 
     # Configurações de modelo
-    parser.add_argument(
-        "--nz",
-        type=int,
-        default=100,
-        help="Tamanho do vetor de ruído latente (padrão: 100)",
-    )
-    parser.add_argument(
-        "--ngf", type=int, default=64, help="Número de filtros do gerador (padrão: 64)"
-    )
-    parser.add_argument(
-        "--ndf",
-        type=int,
-        default=64,
-        help="Número de filtros do discriminador (padrão: 64)",
-    )
+    parser.add_argument("--nz", type=int, default=100)
+    parser.add_argument("--ngf", type=int, default=64)
+    parser.add_argument("--ndf", type=int, default=64)
 
     # Configurações de sistema
-    parser.add_argument(
-        "--dataroot",
-        type=str,
-        default="./data",
-        help="Diretório raiz dos datasets (padrão: ./data)",
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default="./outputs",
-        help="Diretório de saída (padrão: ./outputs)",
-    )
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=2,
-        help="Número de workers para DataLoader (padrão: 2)",
-    )
-    parser.add_argument(
-        "--ngpu", type=int, default=1, help="Número de GPUs (padrão: 1)"
-    )
-
-    # Resumir modelos/datasets
-    parser.add_argument(
-        "--resume",
-        type=str,
-        default=None,
-        help="Caminho para checkpoint para continuar treinamento",
-    )
+    parser.add_argument("--dataroot", type=str, default="./data")
+    parser.add_argument("--output", type=str, default="./outputs")
+    parser.add_argument("--workers", type=int, default=2)
+    parser.add_argument("--ngpu", type=int, default=1)
 
     # Utilitários
-    parser.add_argument(
-        "--list-datasets",
-        action="store_true",
-        help="Lista todos os datasets disponíveis e sai",
-    )
-    parser.add_argument(
-        "--list-models",
-        action="store_true",
-        help="Lista todos os modelos disponíveis e sai",
-    )
+    parser.add_argument("--resume", type=str, default=None)
+    parser.add_argument("--list-datasets", action="store_true")
+    parser.add_argument("--list-models", action="store_true")
 
     args = parser.parse_args()
 
-    # Listar datasets/modelos e sair
+    # Listagens
     if args.list_datasets:
         list_available_datasets()
         return
@@ -507,26 +510,26 @@ Exemplos de uso:
         list_available_models()
         return
 
-    # Validar argumentos
+    # Validação básica
     if args.dataset is None or args.model is None:
         parser.error(
             "--dataset e --model são obrigatórios. "
             "Use --list-datasets e --list-models para ver opções."
         )
 
-    # Obter dispositivo
+    # Dispositivo
     device, ngpu = get_device(args.ngpu)
 
-    # Obter configuração do modelo
-    model_config = get_model_config(args.model)
+    # Para dcgan-cond, usamos config base do dcgan
+    base_model_type = "dcgan" if args.model == "dcgan-cond" else args.model
+    model_config_defaults = get_model_config(base_model_type)
 
-    # Atualizar configurações com argumentos CLI
     if args.lr is None:
-        args.lr = model_config["default_lr"]
+        args.lr = model_config_defaults["default_lr"]
     if args.beta1 is None:
-        args.beta1 = model_config["default_beta1"]
+        args.beta1 = model_config_defaults["default_beta1"]
 
-    # Carregar dataset
+    # Dataset
     print("\n📦 Carregando dataset...")
     dataloader, nc = get_dataset(
         args.dataset,
@@ -536,6 +539,14 @@ Exemplos de uso:
         workers=args.workers,
     )
     print(f"✓ Dataset carregado: {len(dataloader.dataset)} imagens")
+
+    # Descobrir num_classes se dataset suportar
+    num_classes = None
+    if args.dataset in DATASET_CONFIGS:
+        ds_cfg = DATASET_CONFIGS[args.dataset]
+        classes = ds_cfg.get("classes", [])
+        if classes:
+            num_classes = len(classes)
 
     # Criar modelos
     print("\n🤖 Criando modelos...")
@@ -547,18 +558,26 @@ Exemplos de uso:
         "img_size": args.img_size,
     }
 
-    generator, discriminator = get_model(args.model, model_cfg)
+    is_conditional = args.model == "dcgan-cond"
+    if is_conditional:
+        if num_classes is None:
+            raise ValueError(
+                f"O dataset '{args.dataset}' não possui 'classes' definidas em DATASET_CONFIGS, "
+                "necessário para dcgan-cond."
+            )
+        model_cfg["num_classes"] = num_classes
+
+    generator, discriminator_or_critic = get_model(args.model, model_cfg)
     generator = generator.to(device)
-    discriminator = discriminator.to(device)
+    discriminator_or_critic = discriminator_or_critic.to(device)
 
-    # Resumo dos modelos
-    print_model_summary(generator, discriminator)
+    print_model_summary(generator, discriminator_or_critic)
 
-    # Criar diretório de saída
+    # Diretório de saída
     output_dir = create_output_dir(args.output, args.dataset, args.model)
     print(f"\n📁 Diretório de saída: {output_dir}")
 
-    # Salvar configuração
+    # Config base
     config = {
         "dataset": args.dataset,
         "model": args.model,
@@ -574,19 +593,22 @@ Exemplos de uso:
         "ngpu": ngpu,
     }
 
-    # Adicionar configurações específicas do modelo
+    # Flags específicas
+    if is_conditional:
+        config["is_conditional"] = True
+        config["num_classes"] = num_classes
+        config["text_conditional"] = True  # usado pelo app_gui para saber que entende prompt
     if args.model == "wgan-gp":
-        config["n_critic"] = model_config.get("n_critic", 5)
-        config["lambda_gp"] = model_config.get("lambda_gp", 10.0)
+        config["n_critic"] = model_config_defaults.get("n_critic", 5)
+        config["lambda_gp"] = model_config_defaults.get("lambda_gp", 10.0)
 
     save_config(config, output_dir)
 
-    # Treinar
-    if args.model == "dcgan":
-        train_dcgan(generator, discriminator, dataloader, device, config, output_dir)
+    # Treino
+    if args.model in ("dcgan", "dcgan-cond"):
+        train_dcgan(generator, discriminator_or_critic, dataloader, device, config, output_dir)
     elif args.model == "wgan-gp":
-        train_wgan_gp(generator, discriminator, dataloader, device, config, output_dir)
-
+        train_wgan_gp(generator, discriminator_or_critic, dataloader, device, config, output_dir)
 
 if __name__ == "__main__":
     main()

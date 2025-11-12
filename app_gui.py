@@ -16,33 +16,23 @@ from config import DATASET_CONFIGS
 
 def find_available_models():
     """
-    Procura checkpoints nos diretórios padrão definidos em download_models.py:
-      outputs/<dataset>/dcgan_pretrained/checkpoints/checkpoint_latest.pth
-    Retorna dict: { "mnist": path, "cifar10": path, ... }
+    Vasculha outputs/**/checkpoint_latest.pth e, para cada dataset
+    (pasta logo após 'outputs/'), escolhe o checkpoint mais recente.
+    Retorna: { dataset_name: ckpt_path_mais_recente }
     """
-    candidates = {}
-
-    # Padrões conhecidos
-    patterns = [
-        ("mnist",         r"outputs\mnist\dcgan_pretrained\checkpoints\checkpoint_latest.pth"),
-        ("cifar10",       r"outputs\cifar10\dcgan_pretrained\checkpoints\checkpoint_latest.pth"),
-        ("fashion-mnist", r"outputs\fashion-mnist\dcgan_pretrained\checkpoints\checkpoint_latest.pth"),
-    ]
-
-    for name, path in patterns:
-        if os.path.exists(path):
-            candidates[name] = path
-
-    # fallback: qualquer checkpoint_latest.pth na árvore
-    if not candidates:
-        for ckpt in glob.glob(os.path.join("outputs", "**", "checkpoint_latest.pth"), recursive=True):
-            parts = ckpt.replace("/", os.sep).split(os.sep)
-            if len(parts) >= 3:
-                ds = parts[1]  # outputs/<dataset>/...
-                candidates[ds] = ckpt
-
-    return candidates
-
+    found = {}
+    for ckpt in glob.glob(os.path.join("outputs", "**", "checkpoint_latest.pth"), recursive=True):
+        parts = ckpt.replace("/", os.sep).split(os.sep)
+        if len(parts) >= 3 and parts[0] == "outputs":
+            ds = parts[1]  # outputs/<dataset>/...
+            try:
+                mtime = os.path.getmtime(ckpt)
+            except OSError:
+                continue
+            if ds not in found or mtime > found[ds][1]:
+                found[ds] = (ckpt, mtime)
+    # só o caminho
+    return {ds: data[0] for ds, data in found.items()}
 
 AVAILABLE_MODELS = find_available_models()
 
@@ -54,6 +44,9 @@ current_checkpoint = None
 generator = None
 nz = 100
 generation_counter = 0
+# controle lógico do tipo de modelo e classes
+is_conditional = False   # True para modelos "dcgan-cond"
+classes_map = []         # nomes de classe do dataset atual (DATASET_CONFIGS)
 
 # -------------------------------------------------------
 # Utilidades de prompt
@@ -83,6 +76,32 @@ def parse_prompt(prompt, dataset_name):
 
     return None
 
+def class_index_from_prompt(prompt_text: str, dataset_name: str) -> int | None:
+    """
+    Retorna índice de classe a partir do texto do usuário.
+    - Casa por substring com DATASET_CONFIGS[dataset]['classes'].
+    - Para MNIST, aceita o primeiro dígito no texto.
+    """
+    classes = DATASET_CONFIGS.get(dataset_name, {}).get("classes", [])
+    if not classes or not prompt_text:
+        return None
+
+    text = prompt_text.lower()
+
+    # 1) por nome de classe (CIFAR-10, Fashion-MNIST etc.)
+    for i, cname in enumerate(classes):
+        if cname and cname.lower() in text:
+            return i
+
+    # 2) MNIST: aceita dígito
+    if dataset_name == "mnist":
+        nums = re.findall(r"\d", prompt_text)
+        if nums:
+            d = int(nums[0])
+            if 0 <= d < len(classes):
+                return d
+
+    return None
 
 def prompt_to_seed(prompt_text, dataset_name, selected_class, extra=0):
     """
@@ -91,12 +110,9 @@ def prompt_to_seed(prompt_text, dataset_name, selected_class, extra=0):
     mantendo o prompt ainda como parte da chave.
     """
     base = f"{dataset_name}|{selected_class or ''}|{prompt_text}|{extra}"
-    # usar hash estável (não depende do processo)
     import hashlib
     h = hashlib.sha256(base.encode("utf-8")).hexdigest()
-    # pega uma parte e converte pra int dentro do range aceitável
-    return int(h[:8], 16)  # 32 bits suficientes
-
+    return int(h[:8], 16)  # 32 bits já são suficientes
 
 
 # -------------------------------------------------------
@@ -119,9 +135,11 @@ def load_generator(dataset_name):
 
     ckpt_path = AVAILABLE_MODELS[dataset_name]
 
-    if (generator is not None
+    if (
+        generator is not None
         and current_dataset == dataset_name
-        and current_checkpoint == ckpt_path):
+        and current_checkpoint == ckpt_path
+    ):
         # já carregado
         return True
 
@@ -141,23 +159,56 @@ def load_generator(dataset_name):
     config = ckpt.get("config", {})
     model_type = config.get("model", "dcgan")
 
-    nz = config.get("nz", 100)
+    nz_local = config.get("nz", 100)
     ngf = config.get("ngf", 64)
     ndf = config.get("ndf", 64)
     ds_name = config.get("dataset", dataset_name)
+
+    # sinaliza se o checkpoint é condicional e carrega as classes do dataset
+    global is_conditional, classes_map
+    is_conditional = (str(model_type).lower() == "dcgan-cond") or bool(config.get("is_conditional", False))
+    classes_map = DATASET_CONFIGS.get(ds_name, {}).get("classes", [])
 
     # canais / tamanho baseado no checkpoint
     nc = config.get("nc", 1 if ds_name == "mnist" else 3)
     img_size = config.get("img_size", 28 if ds_name == "mnist" else 32)
 
+    # ---------- TUDO ABAIXO PRECISA ESTAR DENTRO DA FUNÇÃO ----------
+    # Se for condicional, precisamos de num_classes (e opcionalmente text_conditional)
+    num_classes = None
+    text_conditional = False
+
+    # monta a config base do gerador
     model_config = {
-        "nz": nz,
+        "nz": nz_local,
         "ngf": ngf,
         "ndf": ndf,
         "nc": nc,
         "img_size": img_size,
     }
 
+    # se o checkpoint/modelo for condicional, garantimos num_classes
+    if is_conditional:
+        num_classes = config.get("num_classes", None)
+        text_conditional = bool(config.get("text_conditional", False))
+
+        # tenta inferir pelo mapeamento de classes do dataset (ex.: 10 no MNIST/CIFAR10)
+        if num_classes is None and classes_map:
+            num_classes = len(classes_map)
+
+        if num_classes is None:
+            messagebox.showerror(
+                "Erro ao inicializar gerador",
+                "num_classes é obrigatório para dcgan-cond"
+            )
+            return False
+
+        model_config.update({
+            "num_classes": num_classes,
+            "text_conditional": text_conditional,
+        })
+
+    # cria o gerador (condicional ou não) com a config montada
     try:
         gen, _ = get_model(model_type, model_config)
         gen.load_state_dict(ckpt["generator_state_dict"])
@@ -167,6 +218,8 @@ def load_generator(dataset_name):
         messagebox.showerror("Erro ao inicializar gerador", str(e))
         return False
 
+    # atualiza estado global só no final (se tudo deu certo)
+    nz = nz_local
     generator = gen
     current_dataset = ds_name
     current_checkpoint = ckpt_path
@@ -192,9 +245,8 @@ def generate_image(prompt_text, image_label, dataset_var):
     # interpretar prompt dentro do dataset escolhido
     selected_class = parse_prompt(prompt_text, dataset_name)
 
-    # incrementa contador para cada geração
+    # incrementa contador para variar seed a cada geração
     generation_counter += 1
-
     seed = prompt_to_seed(prompt_text, dataset_name, selected_class, extra=generation_counter)
 
     try:
@@ -204,11 +256,20 @@ def generate_image(prompt_text, image_label, dataset_var):
         noise = torch.randn(1, nz, 1, 1, generator=g, device=device)
 
         with torch.no_grad():
-            fake = generator(noise).detach().cpu()
+            if is_conditional:
+                # extrai índice de classe a partir do prompt; default=0 se não achou
+                selected_idx = class_index_from_prompt(prompt_text, dataset_name)
+                if selected_idx is None:
+                    selected_idx = 0
+                labels = torch.tensor([selected_idx], device=device, dtype=torch.long)
+                fake = generator(noise, labels).detach().cpu()
+            else:
+                fake = generator(noise).detach().cpu()
 
         fake = (fake + 1) / 2  # [-1,1] -> [0,1]
         fake = fake.squeeze(0)
 
+        # grayscale vs RGB
         if fake.shape[0] == 1:
             img_np = fake[0].numpy()
             img = Image.fromarray((img_np * 255).astype("uint8"), mode="L")
@@ -216,7 +277,8 @@ def generate_image(prompt_text, image_label, dataset_var):
             img_np = fake.permute(1, 2, 0).numpy()
             img = Image.fromarray((img_np * 255).astype("uint8"), mode="RGB")
 
-        img = img.resize((320, 320), Image.NEAREST)
+        # tamanho maior pra ficar mais bonito na UI
+        img = img.resize((340, 340), Image.NEAREST)
 
         tk_img = ImageTk.PhotoImage(img)
         image_label.config(image=tk_img, text="")
@@ -225,9 +287,8 @@ def generate_image(prompt_text, image_label, dataset_var):
     except Exception as e:
         messagebox.showerror("Erro ao gerar imagem", str(e))
 
-
 # -------------------------------------------------------
-# Interface Tkinter (APENAS ESTÉTICA)
+# Interface Tkinter (somente estética)
 # -------------------------------------------------------
 
 def main():
@@ -244,11 +305,12 @@ def main():
     # ---------- janela base ----------
     root = tk.Tk()
     root.title("Gerador de Imagens IA")
-    root.geometry("720x520")  # um pouco maior
-    root.minsize(720, 520)
-    root.configure(bg="#0f172a")  # azul bem escuro (estilo dashboard moderno)
+    # janela um pouco maior, estilo dashboard
+    root.geometry("800x560")
+    root.minsize(800, 560)
+    root.configure(bg="#0f172a")  # azul escuro
 
-    # ---------- "card" central ----------
+    # ---------- container externo ----------
     outer = tk.Frame(
         root,
         bg="#0f172a",
@@ -257,6 +319,7 @@ def main():
     )
     outer.pack(fill="both", expand=True)
 
+    # ---------- "card" central ----------
     card = tk.Frame(
         outer,
         bg="#111827",           # cinza-azulado escuro
@@ -265,7 +328,7 @@ def main():
     )
     card.pack(fill="both", expand=True)
 
-    # header
+    # ---------- header ----------
     header = tk.Frame(card, bg="#111827")
     header.pack(fill="x", padx=24, pady=(20, 10))
 
@@ -289,15 +352,12 @@ def main():
     )
     subtitle_label.pack(side="left", padx=(12, 0))
 
-    # conteúdo principal (imagem à esquerda, controles à direita)
+    # ---------- conteúdo principal ----------
     content = tk.Frame(card, bg="#111827")
     content.pack(fill="both", expand=True, padx=24, pady=(10, 20))
 
-    # ---------- coluna da imagem ----------
-    image_container = tk.Frame(
-        content,
-        bg="#111827",
-    )
+    # coluna da imagem
+    image_container = tk.Frame(content, bg="#111827")
     image_container.pack(side="left", fill="both", expand=True)
 
     image_frame = tk.Frame(
@@ -305,9 +365,9 @@ def main():
         bg="#111827",
         bd=0,
         highlightbackground="#1f2937",
-        highlightthickness=1,
+        highlightthickness=1,   # borda sutil
     )
-    image_frame.place(relx=0.5, rely=0.5, anchor="center", width=340, height=340)
+    image_frame.place(relx=0.5, rely=0.5, anchor="center", width=360, height=360)
 
     image_label = tk.Label(
         image_frame,
@@ -318,14 +378,11 @@ def main():
     )
     image_label.place(relx=0.5, rely=0.5, anchor="center")
 
-    # ---------- coluna de controles ----------
-    controls = tk.Frame(
-        content,
-        bg="#111827",
-    )
+    # coluna de controles
+    controls = tk.Frame(content, bg="#111827")
     controls.pack(side="right", fill="y", padx=(24, 0))
 
-    # seleção de modelo
+    # seleção de modelo/dataset
     lbl_model = tk.Label(
         controls,
         text="Modelo / Dataset",
@@ -348,7 +405,7 @@ def main():
         highlightthickness=0,
         bd=1,
         relief="flat",
-        font=("Segoe UI", 9)
+        font=("Segoe UI", 9),
     )
     option["menu"].config(
         bg="#111827",
@@ -359,7 +416,7 @@ def main():
     )
     option.pack(fill="x", pady=(4, 16))
 
-            # prompt label
+    # prompt label
     lbl_prompt = tk.Label(
         controls,
         text="Prompt (usado como semente)",
@@ -370,15 +427,16 @@ def main():
     )
     lbl_prompt.pack(fill="x")
 
-    # contêiner somente para criar o padding horizontal (mesma cor do fundo)
+    # contêiner para dar padding interno no Entry (borda "invisível")
     prompt_container = tk.Frame(
         controls,
-        bg="#111827",   # igual ao fundo -> borda some
+        bg="#111827",
         bd=0,
         highlightthickness=0,
     )
     prompt_container.pack(fill="x", pady=(4, 16))
 
+    # Entry com espaçamento lateral (texto não fica colado na borda)
     prompt_entry = tk.Entry(
         prompt_container,
         bd=0,
@@ -387,22 +445,11 @@ def main():
         insertbackground="#9ca3af",
         font=("Segoe UI", 9),
         highlightthickness=1,
-        highlightbackground="#374151",  # borda sutil (opcional)
-        highlightcolor="#2563eb",       # cor quando focado
+        highlightbackground="#374151",  # borda sutil
+        highlightcolor="#2563eb",       # cor ao focar
         relief="flat",
     )
-    prompt_entry.pack(fill="x", padx=8, ipady=6)
-
-    prompt_entry = tk.Entry(
-        prompt_container,
-        bd=0,
-        bg="#111827",
-        fg="#e5e7eb",
-        insertbackground="#9ca3af",
-        highlightthickness=0,
-        font=("Segoe UI", 9),
-    )
-    # padx aqui cria o espaço entre o texto e a borda esquerda/direita
+    # padx cria o "padding" entre texto e borda visual
     prompt_entry.pack(fill="x", padx=8, ipady=6)
 
     # botão gerar
@@ -427,11 +474,12 @@ def main():
     )
     generate_button.pack(fill="x")
 
-    # dica embaixo
+    # dica
     hint_label = tk.Label(
         controls,
-        text="Dica: use o mesmo prompt para repetir\n"
-             "a mesma amostra do modelo.",
+        text="Dica: o prompt é usado como semente.\n"
+             "Mesmo prompt → imagem consistente\n"
+             "Prompts diferentes → variações.",
         bg="#111827",
         fg="#6b7280",
         font=("Segoe UI", 8),

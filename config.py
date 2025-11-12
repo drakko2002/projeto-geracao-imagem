@@ -36,7 +36,7 @@ DATASET_CONFIGS = {
     "mnist": {
         "name": "MNIST",
         "description": "Dígitos escritos à mão 28x28 em escala de cinza",
-        "classes": [str(i) for i in range(10)],
+        "classes": ["0","1","2","3","4","5","6","7","8","9"],
         "nc": 1,  # Grayscale
         "default_img_size": 64,
         "download": True,
