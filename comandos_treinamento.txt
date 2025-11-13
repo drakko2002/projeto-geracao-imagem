@@ -1,0 +1,13 @@
+Comandos para treinar os modelos, apenas copiar e colar no console.
+Observação: 
+- Rodar o comando com muitas epochs costuma demorar muito, quanto menos epochs, mais rápido será o processo de treinamento.
+- O treinamento é apenas local.
+
+Treinar mnist(números):
+python train.py --dataset mnist --model dcgan-cond --img-size 128 --epochs 120 --batch-size 128 --nz 128 --ngf 128 --ndf 128
+
+Treinar cifar10(animais, veículos...):
+python train.py --dataset cifar10 --model dcgan-cond --img-size 128 --epochs 120 --batch-size 128 --nz 128 --ngf 128 --ndf 128
+
+Treinar fashion-mnist(peças de roupa):
+python train.py --dataset fashion-mnist --model dcgan-cond --img-size 128 --epochs 120 --batch-size 128 --nz 128 --ngf 128 --ndf 128
