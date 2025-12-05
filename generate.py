@@ -12,9 +12,21 @@ import json
 import os
 
 import torch
+from PIL import Image
 
 from models import get_model
 from utils import generate_samples
+
+# ====================================================================================
+# Constantes
+# ====================================================================================
+
+# Mapeamento de métodos de upscale para constantes PIL
+UPSCALE_METHODS = {
+    "lanczos": Image.LANCZOS,
+    "bicubic": Image.BICUBIC,
+    "nearest": Image.NEAREST,
+}
 
 
 def main():
@@ -130,8 +142,6 @@ def main():
 
     # Aplicar upscaling se solicitado
     if args.upscale != "none":
-        from PIL import Image
-        
         scale_factor = int(args.upscale.replace("x", ""))
         print(f"\n📐 Aplicando upscaling {scale_factor}x com método {args.upscale_method}...")
         
@@ -139,20 +149,15 @@ def main():
         img = Image.open(args.output)
         original_size = img.size
         
-        # Aplicar upscaling
+        # Aplicar upscaling usando método do dicionário
         new_size = (original_size[0] * scale_factor, original_size[1] * scale_factor)
-        
-        if args.upscale_method == "lanczos":
-            upscaled = img.resize(new_size, Image.LANCZOS)
-        elif args.upscale_method == "bicubic":
-            upscaled = img.resize(new_size, Image.BICUBIC)
-        else:  # nearest
-            upscaled = img.resize(new_size, Image.NEAREST)
+        upscale_method = UPSCALE_METHODS.get(args.upscale_method, Image.LANCZOS)
+        upscaled = img.resize(new_size, upscale_method)
         
         # Salvar com sufixo
         output_base = args.output.replace(".png", "")
         upscaled_output = f"{output_base}_upscaled_{scale_factor}x.png"
-        upscaled.save(upscaled_output, quality=95)
+        upscaled.save(upscaled_output)
         
         print(f"✓ Imagem upscaled salva em: {upscaled_output}")
         print(f"  Resolução: {original_size[0]}x{original_size[1]} → {new_size[0]}x{new_size[1]}")

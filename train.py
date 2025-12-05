@@ -21,6 +21,12 @@ import torch.optim as optim
 from torch.autograd import grad
 import torchvision.utils as vutils
 
+# ====================================================================================
+# Constantes
+# ====================================================================================
+
+MIN_RESOLUTION = 128  # Resolução mínima suportada
+
 from config import (
     get_dataset,
     get_dataset_info,
@@ -533,10 +539,10 @@ Exemplos de uso:
         )
     
     # Validar resolução mínima
-    if args.img_size < 128:
+    if args.img_size < MIN_RESOLUTION:
         parser.error(
-            f"Resolução mínima é 128px (fornecido: {args.img_size}). "
-            "Use --img-size 128 ou 256 para melhores resultados."
+            f"Resolução mínima é {MIN_RESOLUTION}px (fornecido: {args.img_size}). "
+            f"Use --img-size {MIN_RESOLUTION} ou 256 para melhores resultados."
         )
 
     # Dispositivo

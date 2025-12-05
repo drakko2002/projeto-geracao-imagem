@@ -9,6 +9,12 @@ import os
 import subprocess
 import sys
 
+# ====================================================================================
+# Constantes
+# ====================================================================================
+
+VALID_UPSCALE_OPTIONS = ["2x", "4x", "8x"]  # Opções válidas de upscale
+
 
 def find_latest_checkpoint():
     """Encontra o checkpoint mais recente"""
@@ -54,8 +60,9 @@ def main():
         num_samples = "64"
     
     # Perguntar sobre upscale
-    upscale = input("Aplicar upscaling? (none/2x/4x/8x, padrão: none): ").strip().lower()
-    if not upscale or upscale not in ["2x", "4x", "8x"]:
+    upscale_prompt = f"Aplicar upscaling? (none/{'/'.join(VALID_UPSCALE_OPTIONS)}, padrão: none): "
+    upscale = input(upscale_prompt).strip().lower()
+    if not upscale or upscale not in VALID_UPSCALE_OPTIONS:
         upscale = "none"
 
     # Montar comando
