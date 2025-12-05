@@ -243,7 +243,8 @@ def generate_image(prompt_text, image_label, dataset_var):
                 # Se não encontrou classe no prompt, usa hash determinístico do prompt para escolher classe
                 if selected_idx is None and classes_map:
                     # Usa hash determinístico (SHA256) para distribuir entre classes disponíveis
-                    prompt_hash = int(hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()[:8], 16)
+                    # Usa 16 caracteres (64 bits) para reduzir colisões
+                    prompt_hash = int(hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()[:16], 16)
                     selected_idx = prompt_hash % len(classes_map)
                 elif selected_idx is None:
                     # Fallback se não houver classes mapeadas
