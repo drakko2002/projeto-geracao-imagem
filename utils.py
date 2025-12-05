@@ -338,6 +338,11 @@ def _match_class_name(text_no_accent, cname_no_accent):
     """
     Verifica se o texto corresponde a um nome de classe considerando plural/singular.
     
+    Usa match bidirecional (A in B ou B in A) para permitir flexibilidade no prompt.
+    Por exemplo: "gato" deve casar com "Gatos" e vice-versa.
+    Risco de falso positivo (ex: "car" em "scar") é aceitável dado o contexto de
+    uso (prompts em linguagem natural com classes bem definidas).
+    
     Args:
         text_no_accent: Texto do prompt sem acentos
         cname_no_accent: Nome da classe sem acentos
@@ -345,7 +350,7 @@ def _match_class_name(text_no_accent, cname_no_accent):
     Returns:
         bool: True se houver correspondência
     """
-    # Match direto
+    # Match direto bidirecional
     if cname_no_accent in text_no_accent or text_no_accent in cname_no_accent:
         return True
     
@@ -429,7 +434,7 @@ def prompt_to_seed(prompt_text, dataset_name, selected_class, extra=0):
     Returns:
         int: Seed para geração de ruído
     """
-    import hashlib
+    import hashlib  # Import local por ser usado apenas nesta função
     
     base = f"{dataset_name}|{selected_class or ''}|{prompt_text}|{extra}"
     h = hashlib.sha256(base.encode("utf-8")).hexdigest()

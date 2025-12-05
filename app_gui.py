@@ -225,9 +225,10 @@ def generate_image(prompt_text, image_label, dataset_var):
 
         with torch.no_grad():
             if is_conditional:
-                # extrai índice de classe a partir do prompt; default=0 se não achou
+                # Extrai índice de classe a partir do prompt
                 selected_idx = class_index_from_prompt(prompt_text, dataset_name, DATASET_CONFIGS)
                 if selected_idx is None:
+                    # Fallback para classe 0 quando não encontra match no prompt
                     selected_idx = 0
                 labels = torch.tensor([selected_idx], device=device, dtype=torch.long)
                 fake = generator(noise, labels).detach().cpu()
@@ -454,11 +455,14 @@ def main():
                      "digite um prompt para gerar imagens."
             )
     
-    # botão gerar (com atualização de hint)
+    # botão gerar
     def on_generate():
         prompt_text = prompt_entry.get().strip() or "imagem aleatoria"
         generate_image(prompt_text, image_label, dataset_var)
-        update_hint_text()  # Atualiza a dica após gerar
+        # Atualiza a dica apenas se o modelo foi carregado pela primeira vez
+        # (a dica não muda durante a geração, apenas quando carrega novo modelo)
+        if generator is not None:
+            update_hint_text()
 
     generate_button = tk.Button(
         controls,
