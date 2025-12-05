@@ -9,6 +9,12 @@ import os
 import subprocess
 import sys
 
+# ====================================================================================
+# Constantes
+# ====================================================================================
+
+VALID_UPSCALE_OPTIONS = ["2x", "4x", "8x"]  # Opções válidas de upscale
+
 
 def find_latest_checkpoint():
     """Encontra o checkpoint mais recente"""
@@ -52,6 +58,12 @@ def main():
     num_samples = input("Quantas imagens gerar? (padrão: 64): ").strip()
     if not num_samples:
         num_samples = "64"
+    
+    # Perguntar sobre upscale
+    upscale_prompt = f"Aplicar upscaling? (none/{'/'.join(VALID_UPSCALE_OPTIONS)}, padrão: none): "
+    upscale = input(upscale_prompt).strip().lower()
+    if not upscale or upscale not in VALID_UPSCALE_OPTIONS:
+        upscale = "none"
 
     # Montar comando
     cmd = [
@@ -61,9 +73,13 @@ def main():
         checkpoint,
         "--num-samples",
         num_samples,
+        "--upscale",
+        upscale,
     ]
 
     print(f"\n🎨 Gerando {num_samples} imagens...")
+    if upscale != "none":
+        print(f"   Com upscaling {upscale}")
     print(f"Comando: {' '.join(cmd)}\n")
 
     # Executar

@@ -21,6 +21,12 @@ import torch.optim as optim
 from torch.autograd import grad
 import torchvision.utils as vutils
 
+# ====================================================================================
+# Constantes
+# ====================================================================================
+
+MIN_RESOLUTION = 128  # Resolução mínima suportada
+
 from config import (
     get_dataset,
     get_dataset_info,
@@ -469,7 +475,12 @@ Exemplos de uso:
     # Configurações de treinamento
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch-size", type=int, default=128)
-    parser.add_argument("--img-size", type=int, default=64)
+    parser.add_argument(
+        "--img-size",
+        type=int,
+        default=128,
+        help="Tamanho da imagem (padrão: 128). Presets recomendados: 128, 256. Use potências de 2 (64/128/256).",
+    )
     parser.add_argument(
         "--lr",
         type=float,
@@ -485,8 +496,18 @@ Exemplos de uso:
 
     # Configurações de modelo
     parser.add_argument("--nz", type=int, default=100)
-    parser.add_argument("--ngf", type=int, default=64)
-    parser.add_argument("--ndf", type=int, default=64)
+    parser.add_argument(
+        "--ngf",
+        type=int,
+        default=64,
+        help="Filtros do gerador (padrão: 64). Para 256px, recomenda-se 96-128 para melhor qualidade.",
+    )
+    parser.add_argument(
+        "--ndf",
+        type=int,
+        default=64,
+        help="Filtros do discriminador (padrão: 64). Para 256px, recomenda-se 96-128 para melhor qualidade.",
+    )
 
     # Configurações de sistema
     parser.add_argument("--dataroot", type=str, default="./data")
@@ -515,6 +536,13 @@ Exemplos de uso:
         parser.error(
             "--dataset e --model são obrigatórios. "
             "Use --list-datasets e --list-models para ver opções."
+        )
+    
+    # Validar resolução mínima
+    if args.img_size < MIN_RESOLUTION:
+        parser.error(
+            f"Resolução mínima é {MIN_RESOLUTION}px (fornecido: {args.img_size}). "
+            f"Use --img-size {MIN_RESOLUTION} ou 256 para melhores resultados."
         )
 
     # Dispositivo

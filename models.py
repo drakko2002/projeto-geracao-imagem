@@ -12,7 +12,13 @@ import torch.nn as nn
 
 
 class DCGANGenerator(nn.Module):
-    """Gerador DCGAN - gera imagens a partir de ruído"""
+    """
+    Gerador DCGAN - gera imagens a partir de ruído
+    
+    Compatível com resoluções 64, 128, 256 (potências de 2).
+    Para 256px, recomenda-se usar ngf >= 96-128 para melhor qualidade.
+    Padrão ngf=64 otimizado para VRAM moderada (RTX 4060 8GB).
+    """
 
     def __init__(self, nz=100, ngf=64, nc=3, img_size=64):
         super(DCGANGenerator, self).__init__()
@@ -59,7 +65,13 @@ class DCGANGenerator(nn.Module):
 
 
 class DCGANDiscriminator(nn.Module):
-    """Discriminador DCGAN - classifica imagens como real ou fake"""
+    """
+    Discriminador DCGAN - classifica imagens como real ou fake
+    
+    Compatível com resoluções 64, 128, 256 (potências de 2).
+    Para 256px, recomenda-se usar ndf >= 96-128 para melhor qualidade.
+    Padrão ndf=64 otimizado para VRAM moderada (RTX 4060 8GB).
+    """
 
     def __init__(self, ndf=64, nc=3, img_size=64):
         super(DCGANDiscriminator, self).__init__()
@@ -221,7 +233,13 @@ class ConditionalDCGANDiscriminator(nn.Module):
 
 
 class WGANGenerator(nn.Module):
-    """Gerador para WGAN-GP"""
+    """
+    Gerador para WGAN-GP
+    
+    Compatível com resoluções 64, 128, 256 (potências de 2).
+    Para 256px, recomenda-se usar ngf >= 96-128 para melhor qualidade.
+    Padrão ngf=64 otimizado para VRAM moderada (RTX 4060 8GB).
+    """
 
     def __init__(self, nz=100, ngf=64, nc=3, img_size=64):
         super(WGANGenerator, self).__init__()
@@ -268,7 +286,13 @@ class WGANGenerator(nn.Module):
 
 
 class WGANCritic(nn.Module):
-    """Crítico para WGAN-GP"""
+    """
+    Crítico para WGAN-GP
+    
+    Compatível com resoluções 64, 128, 256 (potências de 2).
+    Para 256px, recomenda-se usar ndf >= 96-128 para melhor qualidade.
+    Padrão ndf=64 otimizado para VRAM moderada (RTX 4060 8GB).
+    """
 
     def __init__(self, ndf=64, nc=3, img_size=64):
         super(WGANCritic, self).__init__()

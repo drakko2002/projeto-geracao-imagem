@@ -254,16 +254,26 @@ python train.py --dataset cifar10 --model dcgan --epochs 50 --batch-size 64
 python train.py --dataset cifar10 --model wgan-gp --epochs 200 --batch-size 64
 ```
 
-### 🖼️ Imagens de Alta Resolução (5+ horas)
+### 🖼️ Imagens de Alta Resolução 128px (2-3 horas)
 
 ```bash
-python train.py --dataset celeba --model dcgan --img-size 128 --ngf 128 --ndf 128 --epochs 100
+python train.py --dataset cifar10 --model dcgan --img-size 128 --epochs 50 --batch-size 64
 ```
 
-### 💾 GPU com Pouca Memória
+### 🖼️ Imagens de Altíssima Resolução 256px (5+ horas)
 
 ```bash
-python train.py --dataset fashion-mnist --model dcgan --batch-size 32 --workers 2
+python train.py --dataset celeba --model dcgan --img-size 256 --ngf 128 --ndf 128 --epochs 100 --batch-size 32
+```
+
+### 💾 GPU com Pouca Memória (RTX 4060 8GB)
+
+```bash
+# 128px - batch-size 64 recomendado
+python train.py --dataset fashion-mnist --model dcgan --img-size 128 --batch-size 64 --workers 2
+
+# 256px - batch-size 32 recomendado
+python train.py --dataset cifar10 --model dcgan --img-size 256 --batch-size 32 --ngf 96 --ndf 96
 ```
 
 ### 📁 Dataset Customizado
@@ -282,11 +292,11 @@ python train.py \
   --model <nome>           # Modelo: dcgan, wgan-gp
   --epochs <num>           # Número de épocas (padrão: 50)
   --batch-size <num>       # Tamanho do batch (padrão: 128)
-  --img-size <num>         # Tamanho da imagem (padrão: 64 ou do dataset)
+  --img-size <num>         # Tamanho da imagem (padrão: 128, presets: 128/256, mínimo: 128)
   --lr <float>             # Learning rate (auto-detectado se omitido)
   --nz <num>               # Dimensão do vetor latente (padrão: 100)
-  --ngf <num>              # Filtros do gerador (padrão: 64)
-  --ndf <num>              # Filtros do discriminador (padrão: 64)
+  --ngf <num>              # Filtros do gerador (padrão: 64, use 96-128 para 256px)
+  --ndf <num>              # Filtros do discriminador (padrão: 64, use 96-128 para 256px)
   --workers <num>          # Workers do DataLoader (padrão: 2)
   --ngpu <num>             # Número de GPUs (padrão: 1)
 ```
@@ -374,6 +384,170 @@ outputs/mnist/dcgan_20241107_120540/
 - ✅ Época atual
 
 **Você pode retomar o treinamento de qualquer checkpoint!**
+
+## 💾 Checkpoints - Guia Completo
+
+### 📍 Onde ficam os checkpoints?
+
+Os checkpoints são salvos automaticamente durante o treinamento em:
+
+```
+outputs/<dataset>/<modelo>_<timestamp>/checkpoints/
+```
+
+Exemplo:
+```
+outputs/mnist/dcgan_20241207_143022/checkpoints/
+├── checkpoint_epoch_10.pth      # Salvo na época 10
+├── checkpoint_epoch_20.pth      # Salvo na época 20
+└── checkpoint_latest.pth        # Sempre o mais recente ⭐
+```
+
+### 🚀 Como usar checkpoints para geração
+
+**Método 1: Automático (recomendado)**
+
+```bash
+python quick_generate.py
+# Encontra automaticamente o último checkpoint e gera imagens
+```
+
+**Método 2: Especificar checkpoint**
+
+```bash
+python generate.py \
+  --checkpoint outputs/mnist/dcgan_20241207_143022/checkpoints/checkpoint_latest.pth \
+  --num-samples 64 \
+  --upscale 2x
+```
+
+**Método 3: Geração interativa com upscale**
+
+```bash
+python generate_interactive.py \
+  --checkpoint outputs/cifar10/dcgan_xxx/checkpoints/checkpoint_latest.pth \
+  --upscale 8 \
+  --upscale-method lanczos
+```
+
+### 🎨 Opções de upscale na geração
+
+Todos os scripts de geração agora suportam upscaling pós-processamento:
+
+```bash
+# Sem upscale (padrão no generate.py)
+python generate.py --checkpoint <path> --upscale none
+
+# Upscale 2x
+python generate.py --checkpoint <path> --upscale 2x
+
+# Upscale 4x com método bicubic
+python generate.py --checkpoint <path> --upscale 4x --upscale-method bicubic
+
+# Upscale 8x com lanczos (melhor qualidade)
+python generate.py --checkpoint <path> --upscale 8x --upscale-method lanczos
+```
+
+**Métodos disponíveis:**
+- `lanczos` - Melhor qualidade (padrão)
+- `bicubic` - Rápido e bom
+- `nearest` - Pixel-perfect (estilo retro)
+
+### 🔄 Como retomar treinamento (futura implementação)
+
+```bash
+# Retomar do último checkpoint
+python train.py --resume outputs/mnist/dcgan_xxx/checkpoints/checkpoint_latest.pth
+
+# Retomar de época específica
+python train.py --resume outputs/mnist/dcgan_xxx/checkpoints/checkpoint_epoch_20.pth
+```
+
+> **Nota:** A funcionalidade de retomar treinamento será implementada em breve.
+
+### 📦 Como transportar para outra máquina
+
+**Passo 1: Preparar para transporte**
+
+```bash
+# Criar pacote com checkpoint e config
+cd outputs/mnist/dcgan_20241207_143022
+zip -r meu_modelo.zip checkpoints/checkpoint_latest.pth config.json
+
+# Ou copiar apenas o essencial
+cp checkpoints/checkpoint_latest.pth ~/modelo_mnist.pth
+cp config.json ~/modelo_mnist_config.json
+```
+
+**Passo 2: Na máquina de destino**
+
+```bash
+# 1. Instalar dependências
+pip install -r requirements.txt
+
+# 2. Criar estrutura de diretórios
+mkdir -p outputs/mnist/modelo_importado/checkpoints
+
+# 3. Copiar arquivos
+cp modelo_mnist.pth outputs/mnist/modelo_importado/checkpoints/checkpoint_latest.pth
+cp modelo_mnist_config.json outputs/mnist/modelo_importado/config.json
+
+# 4. Gerar imagens
+python generate.py \
+  --checkpoint outputs/mnist/modelo_importado/checkpoints/checkpoint_latest.pth \
+  --num-samples 64
+```
+
+### 💡 Dicas de portabilidade
+
+✅ **O que levar:**
+- `checkpoint_latest.pth` (essencial) - ~50-150MB
+- `config.json` (essencial) - <1KB
+- `training_losses.png` (opcional) - Histórico visual
+- `final_samples.png` (opcional) - Exemplos de saída
+
+✅ **Sistemas compatíveis:**
+- Windows, Linux, macOS
+- GPU (CUDA) ou CPU
+- Python 3.8+
+
+✅ **Compartilhamento:**
+- GitHub Releases (<100MB)
+- Google Drive / Dropbox
+- Hugging Face Hub (recomendado para >100MB)
+
+### 📊 Tamanho dos checkpoints
+
+| Modelo | Resolução | ngf/ndf | Tamanho aprox. |
+|--------|-----------|---------|----------------|
+| DCGAN  | 128px     | 64      | ~50MB          |
+| DCGAN  | 256px     | 64      | ~50MB          |
+| DCGAN  | 256px     | 128     | ~150MB         |
+| WGAN-GP| 128px     | 64      | ~50MB          |
+| WGAN-GP| 256px     | 128     | ~150MB         |
+
+### 🎯 Exemplo completo: Compartilhar modelo treinado
+
+```bash
+# 1. Na máquina de origem (após treinar)
+cd outputs/mnist/dcgan_20241207_143022
+zip -r mnist_dcgan_trained.zip \
+  checkpoints/checkpoint_latest.pth \
+  config.json \
+  final_samples.png \
+  training_losses.png
+
+# 2. Compartilhar mnist_dcgan_trained.zip (GitHub, Drive, etc)
+
+# 3. Na máquina de destino
+unzip mnist_dcgan_trained.zip -d imported_model/
+
+# 4. Gerar imagens
+python generate.py \
+  --checkpoint imported_model/checkpoints/checkpoint_latest.pth \
+  --num-samples 100 \
+  --upscale 4x
+```
 
 ## 🔧 Troubleshooting
 
@@ -527,12 +701,19 @@ python train.py --dataset cifar10 --model wgan-gp --epochs 100
 
 ### Q: Qual tamanho de batch usar?
 
-**A:** Depende da memória da GPU:
+**A:** Depende da memória da GPU e resolução:
 
+**Para 128px (padrão):**
 - **16GB+ VRAM:** batch-size 128-256
-- **8GB VRAM:** batch-size 64-128
+- **8GB VRAM (RTX 4060):** batch-size 64-128
 - **4GB VRAM:** batch-size 32-64
 - **CPU:** batch-size 32
+
+**Para 256px:**
+- **16GB+ VRAM:** batch-size 64-128
+- **8GB VRAM (RTX 4060):** batch-size 32-64
+- **4GB VRAM:** batch-size 16-32
+- **CPU:** batch-size 16
 
 ### Q: O que é "mode collapse"?
 
