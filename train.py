@@ -382,26 +382,16 @@ def train_wgan_gp(generator, critic, dataloader, device, config, output_dir):
         epoch_time = time.time() - epoch_start
         elapsed_total = time.time() - start_time
 
-                # Amostras
+        logger.log_epoch(epoch + 1, epochs, errG.item(), errD.item(), epoch_time)
+
+        # Amostras
         if (epoch + 1) % 5 == 0 or epoch == 0:
             samples_dir = os.path.join(output_dir, "samples")
             os.makedirs(samples_dir, exist_ok=True)
             sample_path = os.path.join(samples_dir, f"epoch_{epoch+1}.png")
 
-            if is_conditional and fixed_labels is not None:
-                # Modelos condicionais: gerar manualmente com labels fixos
-                with torch.no_grad():
-                    fake_samples = generator(fixed_noise, fixed_labels).detach().cpu()
-                # [-1, 1] -> [0, 1]
-                fake_samples = (fake_samples + 1) / 2
-                vutils.save_image(
-                    fake_samples,
-                    sample_path,
-                    nrow=8,
-                )
-            else:
-                # Modelos não condicionais usam o helper existente
-                generate_samples(generator, 64, nz, device, sample_path)
+            # WGAN-GP é não condicional, usa helper padrão
+            generate_samples(generator, 64, nz, device, sample_path)
 
             print(f"✓ Amostras salvas: {sample_path}")
 
