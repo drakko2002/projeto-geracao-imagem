@@ -319,7 +319,7 @@ generate_images() {
             read -p "$(echo -e ${YELLOW}Número de imagens [padrão: 64]: ${NC})" num_samples
             NUM_SAMPLES=${num_samples:-64}
             
-            read -p "$(echo -e ${YELLOW}Aplicar upscale? (none/2x/4x/8x) [padrão: none]: ${NC})" upscale
+            read -p "$(echo -e ${YELLOW}'Aplicar upscale? (none/2x/4x/8x) [padrão: none]: '${NC})" upscale
             UPSCALE=${upscale:-none}
             
             echo ""
@@ -475,7 +475,7 @@ generate_by_class() {
         3)
             # Classe específica - opção de múltiplas ou única
             echo ""
-            read -p "$(echo -e ${YELLOW}"Nome da classe (ex: gato, 5, Camiseta): "${NC})" class_name
++            read -p "$(echo -e ${YELLOW}'Nome da classe (ex: gato, 5, Camiseta): '${NC})" class_name
             
             if [ -z "$class_name" ]; then
                 echo -e "${RED}❌ Nome vazio!${NC}"
