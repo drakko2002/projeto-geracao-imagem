@@ -3,13 +3,20 @@
 Funções utilitárias para treinamento e visualização
 """
 
+import hashlib
 import json
 import os
+import re
+import unicodedata
 from datetime import datetime
 
 import matplotlib.pyplot as plt
 import torch
 import torchvision.utils as vutils
+
+# Constantes para geração
+SEED_HASH_LENGTH = 8  # Número de caracteres do hash para gerar seed
+DEFAULT_CLASS_INDEX = 0  # Índice de classe padrão quando não encontra match
 
 # ====================================================================================
 # Funções de salvamento e carregamento
@@ -306,3 +313,179 @@ def estimate_remaining_time(elapsed, current_epoch, total_epochs):
     remaining_seconds = avg_time_per_epoch * remaining_epochs
 
     return format_time(remaining_seconds)
+
+
+# ====================================================================================
+# Funções para geração condicional/incondicional
+# ====================================================================================
+
+
+def _remove_accents(text):
+    """
+    Remove acentos de um texto (português).
+    
+    Args:
+        text: Texto com acentos
+    
+    Returns:
+        str: Texto sem acentos
+    """
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', text)
+        if unicodedata.category(c) != 'Mn'
+    )
+
+
+def _match_class_name(text_no_accent, cname_no_accent):
+    """
+    Verifica se o texto corresponde a um nome de classe considerando plural/singular.
+    
+    Usa match bidirecional (A in B ou B in A) para permitir flexibilidade no prompt.
+    Por exemplo: "gato" deve casar com "Gatos" e vice-versa.
+    Risco de falso positivo (ex: "car" em "scar") é aceitável dado o contexto de
+    uso (prompts em linguagem natural com classes bem definidas).
+    
+    Args:
+        text_no_accent: Texto do prompt sem acentos
+        cname_no_accent: Nome da classe sem acentos
+    
+    Returns:
+        bool: True se houver correspondência
+    """
+    # Match direto bidirecional
+    if cname_no_accent in text_no_accent or text_no_accent in cname_no_accent:
+        return True
+    
+    # Tenta plural/singular (português)
+    if cname_no_accent.endswith('s') and len(cname_no_accent) > 2:
+        singular = cname_no_accent[:-1]
+        
+        # Para palavras terminadas em "oes", também tenta "ao" (avião -> aviões)
+        if singular.endswith('oe'):
+            singular_ao = singular[:-2] + 'ao'
+            if singular_ao in text_no_accent or text_no_accent in singular_ao:
+                return True
+        
+        # Match com singular normal
+        if singular in text_no_accent or text_no_accent in singular:
+            return True
+    
+    return False
+
+
+def class_index_from_prompt(prompt_text, dataset_name, dataset_configs, default=None):
+    """
+    Retorna índice de classe a partir do texto do usuário.
+    - Casa por substring com dataset_configs[dataset]['classes'].
+    - Para MNIST, aceita o primeiro dígito no texto.
+    
+    Args:
+        prompt_text: Texto do prompt do usuário
+        dataset_name: Nome do dataset
+        dataset_configs: Dicionário de configurações de datasets (DATASET_CONFIGS)
+        default: Valor padrão a retornar se não encontrar match (None por padrão)
+    
+    Returns:
+        int ou None: Índice da classe se encontrado, default caso contrário
+    """
+    classes = dataset_configs.get(dataset_name, {}).get("classes", [])
+    if not classes or not prompt_text:
+        return None
+
+    text = prompt_text.lower()
+    text_no_accent = _remove_accents(text)
+
+    # 1) Por nome de classe (CIFAR-10, Fashion-MNIST etc.)
+    for i, cname in enumerate(classes):
+        if not cname:
+            continue
+        
+        cname_lower = cname.lower()
+        
+        # Verifica match com acentos
+        if cname_lower in text or text in cname_lower:
+            return i
+        
+        # Verifica match sem acentos e com plural/singular
+        cname_no_accent = _remove_accents(cname_lower)
+        if _match_class_name(text_no_accent, cname_no_accent):
+            return i
+
+    # 2) MNIST: aceita dígito
+    if dataset_name == "mnist":
+        nums = re.findall(r"\d", prompt_text)
+        if nums:
+            d = int(nums[0])
+            if 0 <= d < len(classes):
+                return d
+
+    return default
+
+
+def prompt_to_seed(prompt_text, dataset_name, selected_class, extra=0):
+    """
+    Gera uma seed determinística a partir do prompt + dataset + classe + extra.
+    O 'extra' é usado para variar a cada clique,
+    mantendo o prompt ainda como parte da chave.
+    
+    Args:
+        prompt_text: Texto do prompt
+        dataset_name: Nome do dataset
+        selected_class: Classe selecionada (pode ser None)
+        extra: Valor extra para variação (ex: contador de geração)
+    
+    Returns:
+        int: Seed para geração de ruído
+    """
+    base = f"{dataset_name}|{selected_class or ''}|{prompt_text}|{extra}"
+    h = hashlib.sha256(base.encode("utf-8")).hexdigest()
+    return int(h[:SEED_HASH_LENGTH], 16)  # 32 bits já são suficientes
+
+
+def is_conditional_checkpoint(checkpoint):
+    """
+    Verifica se um checkpoint é de um modelo condicional.
+    
+    Args:
+        checkpoint: Dicionário carregado do checkpoint
+    
+    Returns:
+        bool: True se o checkpoint é condicional, False caso contrário
+    """
+    config = checkpoint.get("config", {})
+    model_type = config.get("model", "dcgan")
+    
+    # Verifica se é dcgan-cond ou se tem flag is_conditional
+    is_cond = (
+        str(model_type).lower() in ("dcgan-cond", "dcgan_cond", "cgan")
+        or bool(config.get("is_conditional", False))
+        or bool(config.get("text_conditional", False))
+    )
+    
+    return is_cond
+
+
+def get_num_classes_from_checkpoint(checkpoint, dataset_configs):
+    """
+    Extrai o número de classes de um checkpoint condicional.
+    
+    Args:
+        checkpoint: Dicionário carregado do checkpoint
+        dataset_configs: Dicionário de configurações de datasets (DATASET_CONFIGS)
+    
+    Returns:
+        int ou None: Número de classes se disponível, None caso contrário
+    """
+    config = checkpoint.get("config", {})
+    dataset_name = config.get("dataset", "unknown")
+    
+    # Tenta obter num_classes do config do checkpoint
+    num_classes = config.get("num_classes", None)
+    
+    # Se não encontrou, tenta inferir pelo dataset
+    if num_classes is None:
+        classes = dataset_configs.get(dataset_name, {}).get("classes", [])
+        if classes:
+            num_classes = len(classes)
+    
+    return num_classes

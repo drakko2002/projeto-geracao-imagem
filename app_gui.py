@@ -9,6 +9,12 @@ import torch
 
 from models import get_model
 from config import DATASET_CONFIGS
+from utils import (
+    class_index_from_prompt,
+    prompt_to_seed,
+    is_conditional_checkpoint,
+    get_num_classes_from_checkpoint,
+)
 
 # -------------------------------------------------------
 # Descobrir modelos disponíveis (MNIST, CIFAR10, etc)
@@ -47,15 +53,17 @@ generation_counter = 0
 # controle lógico do tipo de modelo e classes
 is_conditional = False   # True para modelos "dcgan-cond"
 classes_map = []         # nomes de classe do dataset atual (DATASET_CONFIGS)
+# callback para atualizar UI quando modelo é carregado
+on_model_loaded_callback = None
 
 # -------------------------------------------------------
-# Utilidades de prompt
+# Utilidades de prompt (para compatibilidade retroativa)
 # -------------------------------------------------------
 
 def parse_prompt(prompt, dataset_name):
     """
     Lê o prompt e tenta mapear para uma 'classe' desse dataset.
-    Isso é só para derivar a seed; o modelo continua sendo incondicional.
+    Mantida para compatibilidade, mas agora usa a função compartilhada.
     """
     if not prompt or dataset_name not in DATASET_CONFIGS:
         return None
@@ -75,44 +83,6 @@ def parse_prompt(prompt, dataset_name):
             return nums[0]
 
     return None
-
-def class_index_from_prompt(prompt_text: str, dataset_name: str) -> int | None:
-    """
-    Retorna índice de classe a partir do texto do usuário.
-    - Casa por substring com DATASET_CONFIGS[dataset]['classes'].
-    - Para MNIST, aceita o primeiro dígito no texto.
-    """
-    classes = DATASET_CONFIGS.get(dataset_name, {}).get("classes", [])
-    if not classes or not prompt_text:
-        return None
-
-    text = prompt_text.lower()
-
-    # 1) por nome de classe (CIFAR-10, Fashion-MNIST etc.)
-    for i, cname in enumerate(classes):
-        if cname and cname.lower() in text:
-            return i
-
-    # 2) MNIST: aceita dígito
-    if dataset_name == "mnist":
-        nums = re.findall(r"\d", prompt_text)
-        if nums:
-            d = int(nums[0])
-            if 0 <= d < len(classes):
-                return d
-
-    return None
-
-def prompt_to_seed(prompt_text, dataset_name, selected_class, extra=0):
-    """
-    Gera uma seed a partir do prompt + dataset + classe + extra.
-    O 'extra' é usado para variar a cada clique,
-    mantendo o prompt ainda como parte da chave.
-    """
-    base = f"{dataset_name}|{selected_class or ''}|{prompt_text}|{extra}"
-    import hashlib
-    h = hashlib.sha256(base.encode("utf-8")).hexdigest()
-    return int(h[:8], 16)  # 32 bits já são suficientes
 
 
 # -------------------------------------------------------
@@ -166,7 +136,7 @@ def load_generator(dataset_name):
 
     # sinaliza se o checkpoint é condicional e carrega as classes do dataset
     global is_conditional, classes_map
-    is_conditional = (str(model_type).lower() == "dcgan-cond") or bool(config.get("is_conditional", False))
+    is_conditional = is_conditional_checkpoint(ckpt)
     classes_map = DATASET_CONFIGS.get(ds_name, {}).get("classes", [])
 
     # canais / tamanho baseado no checkpoint
@@ -223,6 +193,12 @@ def load_generator(dataset_name):
     generator = gen
     current_dataset = ds_name
     current_checkpoint = ckpt_path
+    
+    # Chama callback se definido (para atualizar UI)
+    global on_model_loaded_callback
+    if on_model_loaded_callback:
+        on_model_loaded_callback()
+    
     return True
 
 
@@ -257,10 +233,10 @@ def generate_image(prompt_text, image_label, dataset_var):
 
         with torch.no_grad():
             if is_conditional:
-                # extrai índice de classe a partir do prompt; default=0 se não achou
-                selected_idx = class_index_from_prompt(prompt_text, dataset_name)
-                if selected_idx is None:
-                    selected_idx = 0
+                # Extrai índice de classe a partir do prompt (com fallback para classe 0)
+                selected_idx = class_index_from_prompt(
+                    prompt_text, dataset_name, DATASET_CONFIGS, default=0
+                )
                 labels = torch.tensor([selected_idx], device=device, dtype=torch.long)
                 fake = generator(noise, labels).detach().cpu()
             else:
@@ -452,10 +428,49 @@ def main():
     # padx cria o "padding" entre texto e borda visual
     prompt_entry.pack(fill="x", padx=8, ipady=6)
 
+    # dica (dinâmica baseada no modelo carregado)
+    hint_label = tk.Label(
+        controls,
+        text="Dica: Selecione um modelo e\n"
+             "digite um prompt para gerar imagens.",
+        bg="#111827",
+        fg="#6b7280",
+        font=("Segoe UI", 8),
+        justify="left",
+        anchor="w",
+    )
+    hint_label.pack(fill="x", pady=(8, 0))
+    
+    # Função para atualizar a dica baseada no modelo carregado
+    def update_hint_text():
+        if generator is not None:
+            if is_conditional:
+                hint_label.config(
+                    text="✅ Modelo condicional:\n"
+                         "O prompt controla a classe gerada.\n"
+                         "Ex: 'gato', 'numero 5', 'camiseta'"
+                )
+            else:
+                hint_label.config(
+                    text="⚠️ Modelo incondicional:\n"
+                         "Prompt usado como semente.\n"
+                         "Mesmo prompt → imagem consistente"
+                )
+        else:
+            hint_label.config(
+                text="Dica: Selecione um modelo e\n"
+                     "digite um prompt para gerar imagens."
+            )
+    
+    # Registrar callback para atualizar hint quando modelo for carregado
+    global on_model_loaded_callback
+    on_model_loaded_callback = update_hint_text
+    
     # botão gerar
     def on_generate():
         prompt_text = prompt_entry.get().strip() or "imagem aleatoria"
         generate_image(prompt_text, image_label, dataset_var)
+        # Hint será atualizada automaticamente via callback quando modelo carregar
 
     generate_button = tk.Button(
         controls,
@@ -473,20 +488,6 @@ def main():
         cursor="hand2",
     )
     generate_button.pack(fill="x")
-
-    # dica
-    hint_label = tk.Label(
-        controls,
-        text="Dica: o prompt é usado como semente.\n"
-             "Mesmo prompt → imagem consistente\n"
-             "Prompts diferentes → variações.",
-        bg="#111827",
-        fg="#6b7280",
-        font=("Segoe UI", 8),
-        justify="left",
-        anchor="w",
-    )
-    hint_label.pack(fill="x", pady=(8, 0))
 
     root.mainloop()
 
