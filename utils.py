@@ -3,6 +3,7 @@
 Funções utilitárias para treinamento e visualização
 """
 
+import hashlib
 import json
 import os
 import re
@@ -15,6 +16,7 @@ import torchvision.utils as vutils
 
 # Constantes para geração
 SEED_HASH_LENGTH = 8  # Número de caracteres do hash para gerar seed
+DEFAULT_CLASS_INDEX = 0  # Índice de classe padrão quando não encontra match
 
 # ====================================================================================
 # Funções de salvamento e carregamento
@@ -371,7 +373,7 @@ def _match_class_name(text_no_accent, cname_no_accent):
     return False
 
 
-def class_index_from_prompt(prompt_text, dataset_name, dataset_configs):
+def class_index_from_prompt(prompt_text, dataset_name, dataset_configs, default=None):
     """
     Retorna índice de classe a partir do texto do usuário.
     - Casa por substring com dataset_configs[dataset]['classes'].
@@ -381,9 +383,10 @@ def class_index_from_prompt(prompt_text, dataset_name, dataset_configs):
         prompt_text: Texto do prompt do usuário
         dataset_name: Nome do dataset
         dataset_configs: Dicionário de configurações de datasets (DATASET_CONFIGS)
+        default: Valor padrão a retornar se não encontrar match (None por padrão)
     
     Returns:
-        int ou None: Índice da classe se encontrado, None caso contrário
+        int ou None: Índice da classe se encontrado, default caso contrário
     """
     classes = dataset_configs.get(dataset_name, {}).get("classes", [])
     if not classes or not prompt_text:
@@ -416,7 +419,7 @@ def class_index_from_prompt(prompt_text, dataset_name, dataset_configs):
             if 0 <= d < len(classes):
                 return d
 
-    return None
+    return default
 
 
 def prompt_to_seed(prompt_text, dataset_name, selected_class, extra=0):
@@ -434,8 +437,6 @@ def prompt_to_seed(prompt_text, dataset_name, selected_class, extra=0):
     Returns:
         int: Seed para geração de ruído
     """
-    import hashlib  # Import local por ser usado apenas nesta função
-    
     base = f"{dataset_name}|{selected_class or ''}|{prompt_text}|{extra}"
     h = hashlib.sha256(base.encode("utf-8")).hexdigest()
     return int(h[:SEED_HASH_LENGTH], 16)  # 32 bits já são suficientes

@@ -304,12 +304,10 @@ def generate_with_class(
             print(f"   🎲 Modo: Aleatório (todas as classes)")
             print(f"   ✅ Usando geração CONDICIONAL")
 
-        # Extrai índice de classe do prompt
-        class_idx = class_index_from_prompt(prompt_text, dataset_name, DATASET_CONFIGS)
-        if class_idx is None:
-            # Fallback para classe 0 quando não encontra match no prompt
-            # (geralmente a primeira classe do dataset)
-            class_idx = 0
+        # Extrai índice de classe do prompt (com fallback para classe 0)
+        class_idx = class_index_from_prompt(
+            prompt_text, dataset_name, DATASET_CONFIGS, default=0
+        )
 
         # Gerar ruído aleatório
         noise = torch.randn(num_samples, nz, 1, 1, device=device)

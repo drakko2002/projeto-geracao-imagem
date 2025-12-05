@@ -53,6 +53,8 @@ generation_counter = 0
 # controle lógico do tipo de modelo e classes
 is_conditional = False   # True para modelos "dcgan-cond"
 classes_map = []         # nomes de classe do dataset atual (DATASET_CONFIGS)
+# callback para atualizar UI quando modelo é carregado
+on_model_loaded_callback = None
 
 # -------------------------------------------------------
 # Utilidades de prompt (para compatibilidade retroativa)
@@ -191,6 +193,12 @@ def load_generator(dataset_name):
     generator = gen
     current_dataset = ds_name
     current_checkpoint = ckpt_path
+    
+    # Chama callback se definido (para atualizar UI)
+    global on_model_loaded_callback
+    if on_model_loaded_callback:
+        on_model_loaded_callback()
+    
     return True
 
 
@@ -225,11 +233,10 @@ def generate_image(prompt_text, image_label, dataset_var):
 
         with torch.no_grad():
             if is_conditional:
-                # Extrai índice de classe a partir do prompt
-                selected_idx = class_index_from_prompt(prompt_text, dataset_name, DATASET_CONFIGS)
-                if selected_idx is None:
-                    # Fallback para classe 0 quando não encontra match no prompt
-                    selected_idx = 0
+                # Extrai índice de classe a partir do prompt (com fallback para classe 0)
+                selected_idx = class_index_from_prompt(
+                    prompt_text, dataset_name, DATASET_CONFIGS, default=0
+                )
                 labels = torch.tensor([selected_idx], device=device, dtype=torch.long)
                 fake = generator(noise, labels).detach().cpu()
             else:
@@ -455,14 +462,15 @@ def main():
                      "digite um prompt para gerar imagens."
             )
     
+    # Registrar callback para atualizar hint quando modelo for carregado
+    global on_model_loaded_callback
+    on_model_loaded_callback = update_hint_text
+    
     # botão gerar
     def on_generate():
         prompt_text = prompt_entry.get().strip() or "imagem aleatoria"
         generate_image(prompt_text, image_label, dataset_var)
-        # Atualiza a dica apenas se o modelo foi carregado pela primeira vez
-        # (a dica não muda durante a geração, apenas quando carrega novo modelo)
-        if generator is not None:
-            update_hint_text()
+        # Hint será atualizada automaticamente via callback quando modelo carregar
 
     generate_button = tk.Button(
         controls,
