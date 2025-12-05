@@ -306,3 +306,117 @@ def estimate_remaining_time(elapsed, current_epoch, total_epochs):
     remaining_seconds = avg_time_per_epoch * remaining_epochs
 
     return format_time(remaining_seconds)
+
+
+# ====================================================================================
+# Funções para geração condicional/incondicional
+# ====================================================================================
+
+
+def class_index_from_prompt(prompt_text, dataset_name, dataset_configs):
+    """
+    Retorna índice de classe a partir do texto do usuário.
+    - Casa por substring com dataset_configs[dataset]['classes'].
+    - Para MNIST, aceita o primeiro dígito no texto.
+    
+    Args:
+        prompt_text: Texto do prompt do usuário
+        dataset_name: Nome do dataset
+        dataset_configs: Dicionário de configurações de datasets (DATASET_CONFIGS)
+    
+    Returns:
+        int ou None: Índice da classe se encontrado, None caso contrário
+    """
+    import re
+    
+    classes = dataset_configs.get(dataset_name, {}).get("classes", [])
+    if not classes or not prompt_text:
+        return None
+
+    text = prompt_text.lower()
+
+    # 1) por nome de classe (CIFAR-10, Fashion-MNIST etc.)
+    for i, cname in enumerate(classes):
+        if cname and cname.lower() in text:
+            return i
+
+    # 2) MNIST: aceita dígito
+    if dataset_name == "mnist":
+        nums = re.findall(r"\d", prompt_text)
+        if nums:
+            d = int(nums[0])
+            if 0 <= d < len(classes):
+                return d
+
+    return None
+
+
+def prompt_to_seed(prompt_text, dataset_name, selected_class, extra=0):
+    """
+    Gera uma seed determinística a partir do prompt + dataset + classe + extra.
+    O 'extra' é usado para variar a cada clique,
+    mantendo o prompt ainda como parte da chave.
+    
+    Args:
+        prompt_text: Texto do prompt
+        dataset_name: Nome do dataset
+        selected_class: Classe selecionada (pode ser None)
+        extra: Valor extra para variação (ex: contador de geração)
+    
+    Returns:
+        int: Seed para geração de ruído
+    """
+    import hashlib
+    
+    base = f"{dataset_name}|{selected_class or ''}|{prompt_text}|{extra}"
+    h = hashlib.sha256(base.encode("utf-8")).hexdigest()
+    return int(h[:8], 16)  # 32 bits já são suficientes
+
+
+def is_conditional_checkpoint(checkpoint):
+    """
+    Verifica se um checkpoint é de um modelo condicional.
+    
+    Args:
+        checkpoint: Dicionário carregado do checkpoint
+    
+    Returns:
+        bool: True se o checkpoint é condicional, False caso contrário
+    """
+    config = checkpoint.get("config", {})
+    model_type = config.get("model", "dcgan")
+    
+    # Verifica se é dcgan-cond ou se tem flag is_conditional
+    is_cond = (
+        str(model_type).lower() in ("dcgan-cond", "dcgan_cond", "cgan")
+        or bool(config.get("is_conditional", False))
+        or bool(config.get("text_conditional", False))
+    )
+    
+    return is_cond
+
+
+def get_num_classes_from_checkpoint(checkpoint, dataset_configs):
+    """
+    Extrai o número de classes de um checkpoint condicional.
+    
+    Args:
+        checkpoint: Dicionário carregado do checkpoint
+        dataset_configs: Dicionário de configurações de datasets (DATASET_CONFIGS)
+    
+    Returns:
+        int ou None: Número de classes se disponível, None caso contrário
+    """
+    config = checkpoint.get("config", {})
+    dataset_name = config.get("dataset", "unknown")
+    
+    # Tenta obter num_classes do config do checkpoint
+    num_classes = config.get("num_classes", None)
+    
+    # Se não encontrou, tenta inferir pelo dataset
+    if num_classes is None:
+        classes = dataset_configs.get(dataset_name, {}).get("classes", [])
+        if classes:
+            num_classes = len(classes)
+    
+    return num_classes

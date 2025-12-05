@@ -39,7 +39,13 @@ from PIL import Image, ImageEnhance
 
 from config import DATASET_CONFIGS
 from models import get_model
-from utils import generate_samples
+from utils import (
+    generate_samples,
+    class_index_from_prompt,
+    prompt_to_seed,
+    is_conditional_checkpoint,
+    get_num_classes_from_checkpoint,
+)
 
 
 def upscale_image(image_tensor, scale_factor, method="lanczos", sharpen=1.0):
@@ -112,7 +118,7 @@ def upscale_image(image_tensor, scale_factor, method="lanczos", sharpen=1.0):
 
 def parse_prompt(prompt, dataset_name):
     """
-    Analisa um prompt de texto e extrai a classe desejada
+    Analisa um prompt de texto e extrai a classe desejada (para compatibilidade)
 
     Args:
         prompt: Texto descrevendo o que gerar
@@ -168,6 +174,9 @@ def interactive_menu(checkpoint_path, device):
     checkpoint = torch.load(checkpoint_path, map_location=device)
     config = checkpoint.get("config", {})
     dataset_name = config.get("dataset", "unknown")
+    
+    # Detectar se é condicional
+    is_cond = is_conditional_checkpoint(checkpoint)
 
     print("\n" + "=" * 60)
     print("🎨 GERADOR INTERATIVO DE IMAGENS")
@@ -183,9 +192,14 @@ def interactive_menu(checkpoint_path, device):
 
     print("=" * 60)
     print("\n💡 IMPORTANTE:")
-    print("   ⚠️  Este modelo foi treinado SEM labels (unconditional GAN)")
-    print("   ⚠️  A seleção de classe é SIMULADA - gera imagens aleatórias")
-    print("   ✅  Para controle real, treine um Conditional GAN (c-GAN)")
+    if is_cond:
+        print("   ✅  Este modelo foi treinado COM labels (conditional GAN)")
+        print("   ✅  A seleção de classe tem CONTROLE REAL sobre a geração")
+        print("   ✅  Você pode escolher exatamente qual classe gerar!")
+    else:
+        print("   ⚠️  Este modelo foi treinado SEM labels (unconditional GAN)")
+        print("   ⚠️  A seleção de classe é SIMULADA - gera imagens aleatórias")
+        print("   ✅  Para controle real, treine um Conditional GAN (c-GAN)")
     print()
     print("=" * 60)
     print("\n🎯 Escolha uma das opções:")
@@ -254,28 +268,72 @@ def interactive_menu(checkpoint_path, device):
 
 
 def generate_with_class(
-    generator, num_samples, nz, device, selected_class, dataset_name
+    generator,
+    num_samples,
+    nz,
+    device,
+    selected_class,
+    dataset_name,
+    is_conditional=False,
+    prompt_text="",
 ):
     """
-    Gera imagens 'temáticas' para uma classe
+    Gera imagens, usando condicionamento se o modelo suportar.
 
-    Nota: Para GANs incondicionais, isso apenas gera ruído aleatório.
-    Para controle real de classe, seria necessário um Conditional GAN.
+    Args:
+        generator: Modelo gerador
+        num_samples: Número de amostras a gerar
+        nz: Dimensão do vetor latente
+        device: Dispositivo (CPU/GPU)
+        selected_class: Classe selecionada (pode ser None)
+        dataset_name: Nome do dataset
+        is_conditional: Se True, o modelo é condicional
+        prompt_text: Texto do prompt (usado para seed se incondicional)
+
+    Returns:
+        Tensor com imagens geradas
     """
     print(f"\n🎨 Gerando {num_samples} imagens...")
 
-    if selected_class:
-        print(f"   🎯 Tema: {selected_class}")
-        print(f"   ⚠️  Nota: Geração é aleatória (modelo incondicional)")
+    if is_conditional:
+        # Modo CONDICIONAL - usa labels reais
+        if selected_class:
+            print(f"   🎯 Classe: {selected_class}")
+            print(f"   ✅ Usando geração CONDICIONAL (controle real de classe)")
+        else:
+            print(f"   🎲 Modo: Aleatório (todas as classes)")
+            print(f"   ✅ Usando geração CONDICIONAL")
+
+        # Extrai índice de classe do prompt
+        class_idx = class_index_from_prompt(prompt_text, dataset_name, DATASET_CONFIGS)
+        if class_idx is None:
+            class_idx = 0  # default se não encontrou
+
+        # Gerar ruído aleatório
+        noise = torch.randn(num_samples, nz, 1, 1, device=device)
+
+        # Criar tensor de labels (mesmo label para todas as amostras)
+        labels = torch.full((num_samples,), class_idx, dtype=torch.long, device=device)
+
+        with torch.no_grad():
+            fake_images = generator(noise, labels)
     else:
-        print(f"   🎲 Modo: Aleatório (todas as classes)")
+        # Modo INCONDICIONAL - usa seed derivada do prompt
+        if selected_class:
+            print(f"   🎯 Tema: {selected_class}")
+            print(f"   ⚠️  Nota: Modelo incondicional - usando seed do prompt")
+        else:
+            print(f"   🎲 Modo: Aleatório (todas as classes)")
 
-    # Gerar ruído aleatório
-    # Para conditional GAN, aqui usaríamos embeddings de classe
-    noise = torch.randn(num_samples, nz, 1, 1, device=device)
+        # Derivar seed do prompt para consistência
+        seed = prompt_to_seed(prompt_text, dataset_name, selected_class, extra=0)
+        generator_rng = torch.Generator(device=device).manual_seed(seed)
 
-    with torch.no_grad():
-        fake_images = generator(noise)
+        # Gerar ruído usando a seed derivada
+        noise = torch.randn(num_samples, nz, 1, 1, generator=generator_rng, device=device)
+
+        with torch.no_grad():
+            fake_images = generator(noise)
 
     return fake_images
 
@@ -391,6 +449,10 @@ Para GANs incondicionais, a seleção de classe é apenas simulada.
     config = checkpoint.get("config", {})
     dataset_name = config.get("dataset", "unknown")
 
+    # Detectar se é condicional
+    is_cond = is_conditional_checkpoint(checkpoint)
+    num_classes = get_num_classes_from_checkpoint(checkpoint, DATASET_CONFIGS)
+
     print(f"\n📋 Configurações do modelo:")
     print(f"   Dataset: {dataset_name}")
     print(f"   Modelo: {config.get('model', 'desconhecido')}")
@@ -399,6 +461,11 @@ Para GANs incondicionais, a seleção de classe é apenas simulada.
         f"   Tamanho da imagem: {config.get('img_size', 64)}x{config.get('img_size', 64)}"
     )
     print(f"   Canais: {config.get('nc', 3)}")
+    if is_cond:
+        print(f"   ✅ Tipo: Condicional (suporta controle de classe)")
+        print(f"   Classes: {num_classes}")
+    else:
+        print(f"   ⚠️  Tipo: Incondicional (sem controle de classe)")
 
     # Criar modelo
     model_config = {
@@ -408,6 +475,11 @@ Para GANs incondicionais, a seleção de classe é apenas simulada.
         "nc": config.get("nc", 3),
         "img_size": config.get("img_size", 64),
     }
+
+    # Se for condicional, adicionar num_classes
+    if is_cond and num_classes is not None:
+        model_config["num_classes"] = num_classes
+        model_config["text_conditional"] = config.get("text_conditional", False)
 
     model_type = config.get("model", "dcgan")
     generator, _ = get_model(model_type, model_config)
@@ -450,6 +522,9 @@ Para GANs incondicionais, a seleção de classe é apenas simulada.
     # Gerar imagens
     print(f"\n🎨 Gerando {args.num_samples} imagem(ns)...")
 
+    # Preparar prompt_text para a função
+    prompt_text = args.prompt or args.class_name or selected_class or ""
+
     fake_images = generate_with_class(
         generator,
         args.num_samples,
@@ -457,6 +532,8 @@ Para GANs incondicionais, a seleção de classe é apenas simulada.
         device,
         selected_class,
         dataset_name,
+        is_conditional=is_cond,
+        prompt_text=prompt_text,
     )
 
     original_size = fake_images.shape[-1]  # Altura/largura original
