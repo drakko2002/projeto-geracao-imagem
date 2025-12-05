@@ -12,7 +12,6 @@ Uso:
 import sys
 import os
 import glob
-from pathlib import Path
 
 
 def find_checkpoint_for_dataset(dataset_name):
