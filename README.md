@@ -44,6 +44,8 @@ python train.py --dataset mnist --model dcgan --epochs 25
 
 ## 📥 Instalação
 
+### Linux/Mac
+
 ```bash
 # 1. Clonar repositório
 git clone https://github.com/seu-usuario/projeto-geracao-imagem.git
@@ -52,12 +54,31 @@ cd projeto-geracao-imagem
 # 2. Instalar dependências
 pip install -r requirements.txt
 
-# 3. Dar permissão ao script (Linux/Mac)
+# 3. Dar permissão ao script
 chmod +x run.sh
 
 # 4. Verificar instalação
 python train.py --list-datasets
 ```
+
+### Windows
+
+```batch
+REM 1. Clonar repositório
+git clone https://github.com/seu-usuario/projeto-geracao-imagem.git
+cd projeto-geracao-imagem
+
+REM 2. Executar instalador
+INSTALAR.bat
+
+REM 3. Iniciar o sistema
+INICIAR.bat
+```
+
+**📖 Usuários Windows:** Consulte o [Guia Windows](WINDOWS_README.md) para:
+- Resolver problemas com Fashion-MNIST downloads
+- Configurar sincronização com Google Drive
+- Dicas de performance e troubleshooting
 
 ### Requisitos
 
@@ -72,8 +93,14 @@ python train.py --list-datasets
 
 O jeito mais fácil de usar o sistema:
 
+**Linux/Mac:**
 ```bash
 ./run.sh
+```
+
+**Windows:**
+```batch
+INICIAR.bat
 ```
 
 O menu permite:
@@ -115,7 +142,24 @@ python train.py --help
 
 Após treinar, gere imagens do seu modelo:
 
-#### Opção A: Modo automático (mais fácil)
+#### Opção A: Interface Gráfica (Mais Fácil!)
+
+```bash
+# Linux/Mac
+python app_gui.py
+
+# Windows
+INICIAR.bat
+# Escolha opção 4 (Interface Gráfica)
+```
+
+Interface visual moderna com:
+- ✅ Seleção de modelo por dropdown
+- ✅ Geração guiada por prompt
+- ✅ Pré-visualização em tempo real
+- ✅ Descoberta automática de checkpoints
+
+#### Opção B: Modo automático (linha de comando)
 
 ```bash
 python quick_generate.py
@@ -125,7 +169,7 @@ python quick_generate.py
 - Pergunta quantas imagens gerar
 - Salva no mesmo diretório do modelo
 
-#### Opção B: Especificar checkpoint
+#### Opção C: Especificar checkpoint
 
 ```bash
 python generate.py \
@@ -134,7 +178,7 @@ python generate.py \
   --output minha_imagem.png
 ```
 
-#### Opção C: Via menu interativo
+#### Opção D: Via menu interativo
 
 ```bash
 ./run.sh
