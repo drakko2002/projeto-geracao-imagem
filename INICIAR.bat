@@ -143,7 +143,12 @@ echo.
 echo [%date% %time%] Procurando checkpoint MNIST... >> iniciar.log 2>&1
 
 REM Descobrir checkpoint dinamicamente
-for /f "delims=" %%i in ('python find_checkpoint.py mnist 2^>nul') do set MNIST_CHECKPOINT=%%i
+for /f "delims=" %%i in ('python find_checkpoint.py mnist 2^>^&1') do set MNIST_CHECKPOINT=%%i
+if defined MNIST_CHECKPOINT (
+    echo [%date% %time%] Checkpoint encontrado: %MNIST_CHECKPOINT% >> iniciar.log 2>&1
+) else (
+    echo [%date% %time%] Nenhum checkpoint MNIST encontrado >> iniciar.log 2>&1
+)
 
 REM Verificar se modelo existe
 if not defined MNIST_CHECKPOINT (
@@ -165,15 +170,19 @@ if not defined MNIST_CHECKPOINT (
             goto :menu
         )
         REM Tentar encontrar o checkpoint novamente após o download
-        for /f "delims=" %%i in ('python find_checkpoint.py mnist 2^>nul') do set MNIST_CHECKPOINT=%%i
+        for /f "delims=" %%i in ('python find_checkpoint.py mnist 2^>^&1') do set MNIST_CHECKPOINT=%%i
+        if not defined MNIST_CHECKPOINT (
+            echo ✗ Checkpoint nao encontrado apos download
+            echo [%date% %time%] ERRO: Checkpoint nao encontrado apos download >> iniciar.log 2>&1
+            pause
+            cls
+            goto :menu
+        )
     ) else (
         cls
         goto :menu
     )
 )
-
-echo Checkpoint encontrado: %MNIST_CHECKPOINT%
-echo [%date% %time%] Usando checkpoint: %MNIST_CHECKPOINT% >> iniciar.log 2>&1
 
 echo Exemplos: "numero 5", "mostrar 7", "digito 0"
 echo.
@@ -231,7 +240,12 @@ echo.
 echo [%date% %time%] Procurando checkpoint CIFAR-10... >> iniciar.log 2>&1
 
 REM Descobrir checkpoint dinamicamente
-for /f "delims=" %%i in ('python find_checkpoint.py cifar10 2^>nul') do set CIFAR10_CHECKPOINT=%%i
+for /f "delims=" %%i in ('python find_checkpoint.py cifar10 2^>^&1') do set CIFAR10_CHECKPOINT=%%i
+if defined CIFAR10_CHECKPOINT (
+    echo [%date% %time%] Checkpoint encontrado: %CIFAR10_CHECKPOINT% >> iniciar.log 2>&1
+) else (
+    echo [%date% %time%] Nenhum checkpoint CIFAR-10 encontrado >> iniciar.log 2>&1
+)
 
 REM Verificar se modelo existe
 if not defined CIFAR10_CHECKPOINT (
@@ -253,15 +267,19 @@ if not defined CIFAR10_CHECKPOINT (
             goto :menu
         )
         REM Tentar encontrar o checkpoint novamente após o download
-        for /f "delims=" %%i in ('python find_checkpoint.py cifar10 2^>nul') do set CIFAR10_CHECKPOINT=%%i
+        for /f "delims=" %%i in ('python find_checkpoint.py cifar10 2^>^&1') do set CIFAR10_CHECKPOINT=%%i
+        if not defined CIFAR10_CHECKPOINT (
+            echo ✗ Checkpoint nao encontrado apos download
+            echo [%date% %time%] ERRO: Checkpoint nao encontrado apos download >> iniciar.log 2>&1
+            pause
+            cls
+            goto :menu
+        )
     ) else (
         cls
         goto :menu
     )
 )
-
-echo Checkpoint encontrado: %CIFAR10_CHECKPOINT%
-echo [%date% %time%] Usando checkpoint: %CIFAR10_CHECKPOINT% >> iniciar.log 2>&1
 
 echo Animais: gato, cachorro, passaro, cavalo, cervo, sapo
 echo Veiculos: aviao, carro, navio, caminhao
@@ -322,7 +340,12 @@ echo.
 echo [%date% %time%] Procurando checkpoint Fashion-MNIST... >> iniciar.log 2>&1
 
 REM Descobrir checkpoint dinamicamente
-for /f "delims=" %%i in ('python find_checkpoint.py fashion-mnist 2^>nul') do set FASHION_CHECKPOINT=%%i
+for /f "delims=" %%i in ('python find_checkpoint.py fashion-mnist 2^>^&1') do set FASHION_CHECKPOINT=%%i
+if defined FASHION_CHECKPOINT (
+    echo [%date% %time%] Checkpoint encontrado: %FASHION_CHECKPOINT% >> iniciar.log 2>&1
+) else (
+    echo [%date% %time%] Nenhum checkpoint Fashion-MNIST encontrado >> iniciar.log 2>&1
+)
 
 REM Verificar se modelo existe
 if not defined FASHION_CHECKPOINT (
@@ -344,15 +367,19 @@ if not defined FASHION_CHECKPOINT (
             goto :menu
         )
         REM Tentar encontrar o checkpoint novamente após o download
-        for /f "delims=" %%i in ('python find_checkpoint.py fashion-mnist 2^>nul') do set FASHION_CHECKPOINT=%%i
+        for /f "delims=" %%i in ('python find_checkpoint.py fashion-mnist 2^>^&1') do set FASHION_CHECKPOINT=%%i
+        if not defined FASHION_CHECKPOINT (
+            echo ✗ Checkpoint nao encontrado apos download
+            echo [%date% %time%] ERRO: Checkpoint nao encontrado apos download >> iniciar.log 2>&1
+            pause
+            cls
+            goto :menu
+        )
     ) else (
         cls
         goto :menu
     )
 )
-
-echo Checkpoint encontrado: %FASHION_CHECKPOINT%
-echo [%date% %time%] Usando checkpoint: %FASHION_CHECKPOINT% >> iniciar.log 2>&1
 
 echo Disponiveis: camiseta, calca, pullover, vestido, casaco
 echo              sandalia, camisa, tenis, bolsa, bota

@@ -328,7 +328,3 @@ Crie atalhos no Desktop para acesso rápido:
 - 🐛 **Bugs:** Abra uma [issue](https://github.com/drakko2002/projeto-geracao-imagem/issues)
 - 💡 **Dúvidas:** Verifique o [README principal](README.md)
 - 📧 **Suporte:** Entre em contato através do GitHub
-
----
-
-**Última atualização:** 2024-12-05

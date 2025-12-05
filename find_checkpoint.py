@@ -28,6 +28,10 @@ def find_checkpoint_for_dataset(dataset_name):
     # Normalizar nome do dataset
     dataset_name = dataset_name.lower().strip()
     
+    # Validar entrada
+    if not dataset_name:
+        return None
+    
     # Procurar em outputs/**/checkpoint_latest.pth
     checkpoints = []
     
