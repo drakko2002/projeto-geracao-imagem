@@ -390,7 +390,7 @@ def train_wgan_gp(generator, critic, dataloader, device, config, output_dir):
             os.makedirs(samples_dir, exist_ok=True)
             sample_path = os.path.join(samples_dir, f"epoch_{epoch+1}.png")
 
-            # WGAN-GP é não condicional, usa helper padrão
+            # WGAN-GP is non-conditional, uses standard helper
             generate_samples(generator, 64, nz, device, sample_path)
 
             print(f"✓ Amostras salvas: {sample_path}")
