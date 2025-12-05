@@ -36,6 +36,7 @@ python train.py --dataset mnist --model dcgan --epochs 25
 - 🚀 **Menu interativo** - Configure tudo sem digitar comandos
 - 📦 **5 datasets** - CIFAR-10, MNIST, Fashion-MNIST, CelebA, Custom
 - 🤖 **2 arquiteturas GAN** - DCGAN e WGAN-GP
+- 🎨 **Geração condicional** - Controle de classe via prompt (modelos condicionais)
 - 💾 **Checkpoints automáticos** - Retome treinamento a qualquer momento
 - 📊 **Visualização em tempo real** - Perdas e amostras geradas
 - ⚡ **Suporte GPU/CPU** - Detecta CUDA automaticamente
@@ -271,6 +272,55 @@ python train.py --dataset cifar10 --model wgan-gp --epochs 100
 ```bash
 python train.py --list-models
 ```
+
+### 3. Geração Condicional vs Incondicional
+
+O sistema agora suporta **geração condicional** com controle real de classes!
+
+#### 🎨 Modelos Condicionais (DCGAN-COND)
+
+Para treinar um modelo condicional que permite escolher exatamente qual classe gerar:
+
+```bash
+python train.py --dataset mnist --model dcgan-cond --epochs 25
+```
+
+**Com modelos condicionais você pode:**
+- ✅ Escolher exatamente qual classe gerar via prompt
+- ✅ "gerar um gato" → Gera especificamente a classe 'gato'
+- ✅ "numero 5" → Gera especificamente o dígito 5
+- ✅ Controle real sobre o que é gerado
+
+**Exemplos de uso:**
+
+```bash
+# Gerar específicamente um gato (requer modelo condicional)
+python generate_interactive.py --checkpoint <checkpoint> --prompt "gato"
+
+# Gerar dígito 5 (requer modelo condicional)
+python generate_interactive.py --checkpoint <checkpoint> --prompt "numero 5"
+
+# Gerar camiseta (requer modelo condicional)
+python generate_interactive.py --checkpoint <checkpoint> --prompt "camiseta"
+```
+
+#### ⚠️ Modelos Incondicionais (DCGAN padrão)
+
+Os modelos DCGAN padrão **não têm controle real de classe**:
+- ⚠️ Geram imagens aleatórias do dataset
+- ⚠️ O prompt é usado apenas como "seed" para consistência
+- ⚠️ Mesmo prompt → mesma imagem, mas sem controle de classe
+
+**Para controle real de classe, sempre use `--model dcgan-cond`**
+
+#### 📊 Comparação
+
+| Recurso | DCGAN (incondicional) | DCGAN-COND (condicional) |
+|---------|----------------------|--------------------------|
+| Controle de classe | ❌ Não | ✅ Sim |
+| Prompt → classe específica | ❌ Não (só seed) | ✅ Sim (controle real) |
+| Velocidade de treino | ✅ Mais rápido | ⚠️ Um pouco mais lento |
+| Uso de memória | ✅ Menor | ⚠️ Um pouco maior |
 
 ## 💡 Exemplos Práticos
 
