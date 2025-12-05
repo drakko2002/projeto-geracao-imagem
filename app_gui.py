@@ -1,6 +1,7 @@
 import os
 import glob
 import re
+import hashlib
 import tkinter as tk
 from tkinter import messagebox
 from PIL import Image, ImageTk
@@ -24,6 +25,7 @@ def find_available_models():
     """
     Vasculha outputs/**/checkpoint_latest.pth e, para cada dataset
     (pasta logo após 'outputs/'), escolhe o checkpoint mais recente.
+    Suporta DCGAN, DCGAN-cond e WGAN-GP checkpoints.
     Retorna: { dataset_name: ckpt_path_mais_recente }
     """
     found = {}
@@ -127,7 +129,7 @@ def load_generator(dataset_name):
         return False
 
     config = ckpt.get("config", {})
-    model_type = config.get("model", "dcgan")
+    model_type = config.get("model", "dcgan").lower()
 
     nz_local = config.get("nz", 100)
     ngf = config.get("ngf", 64)
@@ -233,10 +235,21 @@ def generate_image(prompt_text, image_label, dataset_var):
 
         with torch.no_grad():
             if is_conditional:
-                # Extrai índice de classe a partir do prompt (com fallback para classe 0)
+                # Extrai índice de classe a partir do prompt
                 selected_idx = class_index_from_prompt(
-                    prompt_text, dataset_name, DATASET_CONFIGS, default=0
+                    prompt_text, dataset_name, DATASET_CONFIGS, default=None
                 )
+                
+                # Se não encontrou classe no prompt, usa hash determinístico do prompt para escolher classe
+                if selected_idx is None and classes_map:
+                    # Usa hash determinístico (SHA256) para distribuir entre classes disponíveis
+                    # Usa 16 caracteres (64 bits) para reduzir colisões
+                    prompt_hash = int(hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()[:16], 16)
+                    selected_idx = prompt_hash % len(classes_map)
+                elif selected_idx is None:
+                    # Fallback se não houver classes mapeadas
+                    selected_idx = 0
+                
                 labels = torch.tensor([selected_idx], device=device, dtype=torch.long)
                 fake = generator(noise, labels).detach().cpu()
             else:
@@ -446,15 +459,15 @@ def main():
         if generator is not None:
             if is_conditional:
                 hint_label.config(
-                    text="✅ Modelo condicional:\n"
-                         "O prompt controla a classe gerada.\n"
+                    text="✅ Modelo condicional (DCGAN-cond):\n"
+                         "Prompt controla a classe gerada.\n"
                          "Ex: 'gato', 'numero 5', 'camiseta'"
                 )
             else:
                 hint_label.config(
-                    text="⚠️ Modelo incondicional:\n"
-                         "Prompt usado como semente.\n"
-                         "Mesmo prompt → imagem consistente"
+                    text="⚠️ Modelo incondicional (DCGAN/WGAN-GP):\n"
+                         "Prompt varia a seed.\n"
+                         "Prompts diferentes → imagens diferentes"
                 )
         else:
             hint_label.config(
