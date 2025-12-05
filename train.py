@@ -69,6 +69,7 @@ def train_dcgan(generator, discriminator, dataloader, device, config, output_dir
     epochs = config["epochs"]
     lr = config["lr"]
     beta1 = config["beta1"]
+    beta2 = config["beta2"]
     nz = config["nz"]
 
     # Flags para condicional
@@ -80,8 +81,8 @@ def train_dcgan(generator, discriminator, dataloader, device, config, output_dir
 
     # Critério e otimizadores
     criterion = nn.BCELoss()
-    optimizerD = optim.Adam(discriminator.parameters(), lr=lr, betas=(beta1, 0.999))
-    optimizerG = optim.Adam(generator.parameters(), lr=lr, betas=(beta1, 0.999))
+    optimizerD = optim.Adam(discriminator.parameters(), lr=lr, betas=(beta1, beta2))
+    optimizerG = optim.Adam(generator.parameters(), lr=lr, betas=(beta1, beta2))
 
     real_label = 1.0
     fake_label = 0.0
@@ -311,12 +312,13 @@ def train_wgan_gp(generator, critic, dataloader, device, config, output_dir):
     epochs = config["epochs"]
     lr = config["lr"]
     beta1 = config["beta1"]
+    beta2 = config["beta2"]
     nz = config["nz"]
     n_critic = config.get("n_critic", 5)
     lambda_gp = config.get("lambda_gp", 10.0)
 
-    optimizerD = optim.Adam(critic.parameters(), lr=lr, betas=(beta1, 0.999))
-    optimizerG = optim.Adam(generator.parameters(), lr=lr, betas=(beta1, 0.999))
+    optimizerD = optim.Adam(critic.parameters(), lr=lr, betas=(beta1, beta2))
+    optimizerG = optim.Adam(generator.parameters(), lr=lr, betas=(beta1, beta2))
 
     fixed_noise = torch.randn(64, nz, 1, 1, device=device)
 
@@ -483,6 +485,12 @@ Exemplos de uso:
         default=None,
         help="Beta1 do Adam (usa padrão do modelo se não especificado)",
     )
+    parser.add_argument(
+        "--beta2",
+        type=float,
+        default=None,
+        help="Beta2 do Adam (usa padrão do modelo se não especificado)",
+    )
 
     # Configurações de modelo
     parser.add_argument("--nz", type=int, default=100)
@@ -546,6 +554,8 @@ Exemplos de uso:
         args.lr = model_config_defaults["default_lr"]
     if args.beta1 is None:
         args.beta1 = model_config_defaults["default_beta1"]
+    if args.beta2 is None:
+        args.beta2 = model_config_defaults["default_beta2"]
 
     # Dataset
     print("\n📦 Carregando dataset...")
@@ -604,6 +614,7 @@ Exemplos de uso:
         "img_size": args.img_size,
         "lr": args.lr,
         "beta1": args.beta1,
+        "beta2": args.beta2,
         "nz": args.nz,
         "ngf": args.ngf,
         "ndf": args.ndf,
