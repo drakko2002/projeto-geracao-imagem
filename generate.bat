@@ -128,13 +128,14 @@ echo Parametros disponiveis:
 echo   --prompt "texto"         Descrever o que gerar
 echo   --class-name "classe"    Nome exato da classe
 echo   --num-samples N          Numero de imagens (padrao: 1)
-echo   --upscale N              Fator de upscaling (padrao: 8)
-echo   --upscale-method METHOD  lanczos, bicubic, nearest
+echo   --upscale N              Fator de upscaling (padrao: 8 para interactive, none para generate.py)
+echo   --upscale-method METHOD  lanczos, bicubic, nearest (padrao: lanczos)
 echo   --sharpen N              Nitidez 1.0-2.0 (padrao: 1.6)
 echo   --device cuda/cpu        Dispositivo
 echo.
-echo Exemplo:
+echo Exemplos:
 echo   python generate_interactive.py --checkpoint outputs/cifar10/.../checkpoint_latest.pth --prompt "gato" --upscale 16
+echo   python generate.py --checkpoint outputs/mnist/.../checkpoint_latest.pth --num-samples 64 --upscale 4x
 echo.
 echo.
 set /p cmd="Digite o comando completo: "

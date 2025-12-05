@@ -118,12 +118,13 @@ train_model() {
     # ─────────────────────────────────────────────────────────────
     echo -e "${BOLD}PASSO 3/4: Quantas épocas treinar?${NC}"
     echo ""
-    echo -e "  ${CYAN}💡 Recomendações por dataset:${NC}"
+    echo -e "  ${CYAN}💡 Recomendações por dataset (resolução 128px padrão):${NC}"
     echo -e "     • MNIST: 25-50 épocas (~15-30 min)"
     echo -e "     • Fashion-MNIST: 50-75 épocas (~30-45 min)"
     echo -e "     • CIFAR-10: 50-100 épocas (~1-2 horas)"
     echo ""
     echo -e "  ${CYAN}💡 Para testes rápidos: 5-10 épocas${NC}"
+    echo -e "  ${CYAN}💡 Para 256px: use --img-size 256 --ngf 128 --ndf 128${NC}"
     echo ""
     read -p "$(echo -e ${YELLOW}Número de épocas [padrão: 25]: ${NC})" epochs
     EPOCHS=${epochs:-25}
@@ -136,11 +137,13 @@ train_model() {
     # ─────────────────────────────────────────────────────────────
     echo -e "${BOLD}PASSO 4/4: Batch size (ENTER para usar padrão)${NC}"
     echo ""
-    echo -e "  ${CYAN}💡 Recomendações por memória GPU:${NC}"
+    echo -e "  ${CYAN}💡 Recomendações para 128px:${NC}"
     echo -e "     • 16GB+ VRAM: 128-256"
-    echo -e "     • 8GB VRAM: 64-128"
+    echo -e "     • 8GB VRAM (RTX 4060): 64-128"
     echo -e "     • 4GB VRAM: 32-64"
     echo -e "     • CPU: 32"
+    echo ""
+    echo -e "  ${CYAN}💡 Para 256px, use metade do batch size${NC}"
     echo ""
     read -p "$(echo -e ${YELLOW}Batch size [padrão: 128]: ${NC})" batch_size
     BATCH_SIZE=${batch_size:-128}
@@ -316,13 +319,20 @@ generate_images() {
             read -p "$(echo -e ${YELLOW}Número de imagens [padrão: 64]: ${NC})" num_samples
             NUM_SAMPLES=${num_samples:-64}
             
+            read -p "$(echo -e ${YELLOW}Aplicar upscale? (none/2x/4x/8x) [padrão: none]: ${NC})" upscale
+            UPSCALE=${upscale:-none}
+            
             echo ""
             echo -e "${GREEN}🎨 Gerando $NUM_SAMPLES imagens...${NC}"
+            if [ "$UPSCALE" != "none" ]; then
+                echo -e "   Com upscaling $UPSCALE"
+            fi
             echo ""
             
             python generate.py \
                 --checkpoint "$checkpoint_path" \
-                --num-samples "$NUM_SAMPLES"
+                --num-samples "$NUM_SAMPLES" \
+                --upscale "$UPSCALE"
             ;;
         0)
             return
