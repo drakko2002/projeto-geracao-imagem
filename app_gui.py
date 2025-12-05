@@ -1,6 +1,7 @@
 import os
 import glob
 import re
+import hashlib
 import tkinter as tk
 from tkinter import messagebox
 from PIL import Image, ImageTk
@@ -239,10 +240,10 @@ def generate_image(prompt_text, image_label, dataset_var):
                     prompt_text, dataset_name, DATASET_CONFIGS, default=None
                 )
                 
-                # Se não encontrou classe no prompt, usa hash do prompt para escolher classe
+                # Se não encontrou classe no prompt, usa hash determinístico do prompt para escolher classe
                 if selected_idx is None and classes_map:
-                    # Usa hash do prompt para distribuir entre classes disponíveis
-                    prompt_hash = abs(hash(prompt_text))
+                    # Usa hash determinístico (SHA256) para distribuir entre classes disponíveis
+                    prompt_hash = int(hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()[:8], 16)
                     selected_idx = prompt_hash % len(classes_map)
                 elif selected_idx is None:
                     # Fallback se não houver classes mapeadas
