@@ -335,10 +335,47 @@ def class_index_from_prompt(prompt_text, dataset_name, dataset_configs):
 
     text = prompt_text.lower()
 
+    # Função auxiliar para remover acentos (português)
+    def remove_accents(s):
+        import unicodedata
+        return ''.join(
+            c for c in unicodedata.normalize('NFD', s)
+            if unicodedata.category(c) != 'Mn'
+        )
+
+    text_no_accent = remove_accents(text)
+
     # 1) por nome de classe (CIFAR-10, Fashion-MNIST etc.)
     for i, cname in enumerate(classes):
-        if cname and cname.lower() in text:
+        if not cname:
+            continue
+        cname_lower = cname.lower()
+        cname_no_accent = remove_accents(cname_lower)
+        
+        # Verifica se a classe está no texto OU se o texto está na classe
+        # Isso permite "gato" casar com "Gatos" e vice-versa
+        if cname_lower in text or text in cname_lower:
             return i
+        
+        # Verifica sem acentos (para "aviao" casar com "Aviões")
+        if cname_no_accent in text_no_accent or text_no_accent in cname_no_accent:
+            return i
+        
+        # Também tenta match com plural/singular (português)
+        # "gato" -> "gatos", "aviao" -> "avioes", etc.
+        if cname_no_accent.endswith('s') and len(cname_no_accent) > 2:
+            # Remove 's' final
+            singular = cname_no_accent[:-1]
+            
+            # Para palavras terminadas em "oes", também tenta "ao" (avião -> aviões)
+            if singular.endswith('oe'):
+                singular_ao = singular[:-2] + 'ao'
+                if singular_ao in text_no_accent or text_no_accent in singular_ao:
+                    return i
+            
+            # Match com singular normal
+            if singular in text_no_accent or text_no_accent in singular:
+                return i
 
     # 2) MNIST: aceita dígito
     if dataset_name == "mnist":
