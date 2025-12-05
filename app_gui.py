@@ -420,32 +420,11 @@ def main():
     # padx cria o "padding" entre texto e borda visual
     prompt_entry.pack(fill="x", padx=8, ipady=6)
 
-    # botão gerar
-    def on_generate():
-        prompt_text = prompt_entry.get().strip() or "imagem aleatoria"
-        generate_image(prompt_text, image_label, dataset_var)
-
-    generate_button = tk.Button(
-        controls,
-        text="Gerar imagem",
-        command=on_generate,
-        bg="#2563eb",
-        fg="#f9fafb",
-        activebackground="#1d4ed8",
-        activeforeground="#f9fafb",
-        bd=0,
-        relief="flat",
-        font=("Segoe UI", 10, "bold"),
-        padx=16,
-        pady=8,
-        cursor="hand2",
-    )
-    generate_button.pack(fill="x")
-
     # dica (dinâmica baseada no modelo carregado)
     hint_label = tk.Label(
         controls,
-        text="",  # Será atualizado quando um modelo for carregado
+        text="Dica: Selecione um modelo e\n"
+             "digite um prompt para gerar imagens.",
         bg="#111827",
         fg="#6b7280",
         font=("Segoe UI", 8),
@@ -475,17 +454,28 @@ def main():
                      "digite um prompt para gerar imagens."
             )
     
-    # Atualizar dica inicial
-    update_hint_text()
-    
-    # Modificar on_generate para atualizar a dica após carregar modelo
-    original_on_generate = on_generate
-    def on_generate_with_hint():
-        original_on_generate()
-        update_hint_text()
-    
-    # Atualizar o comando do botão
-    generate_button.config(command=on_generate_with_hint)
+    # botão gerar (com atualização de hint)
+    def on_generate():
+        prompt_text = prompt_entry.get().strip() or "imagem aleatoria"
+        generate_image(prompt_text, image_label, dataset_var)
+        update_hint_text()  # Atualiza a dica após gerar
+
+    generate_button = tk.Button(
+        controls,
+        text="Gerar imagem",
+        command=on_generate,
+        bg="#2563eb",
+        fg="#f9fafb",
+        activebackground="#1d4ed8",
+        activeforeground="#f9fafb",
+        bd=0,
+        relief="flat",
+        font=("Segoe UI", 10, "bold"),
+        padx=16,
+        pady=8,
+        cursor="hand2",
+    )
+    generate_button.pack(fill="x")
 
     root.mainloop()
 

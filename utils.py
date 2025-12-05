@@ -5,11 +5,16 @@ Funções utilitárias para treinamento e visualização
 
 import json
 import os
+import re
+import unicodedata
 from datetime import datetime
 
 import matplotlib.pyplot as plt
 import torch
 import torchvision.utils as vutils
+
+# Constantes para geração
+SEED_HASH_LENGTH = 8  # Número de caracteres do hash para gerar seed
 
 # ====================================================================================
 # Funções de salvamento e carregamento
@@ -313,6 +318,54 @@ def estimate_remaining_time(elapsed, current_epoch, total_epochs):
 # ====================================================================================
 
 
+def _remove_accents(text):
+    """
+    Remove acentos de um texto (português).
+    
+    Args:
+        text: Texto com acentos
+    
+    Returns:
+        str: Texto sem acentos
+    """
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', text)
+        if unicodedata.category(c) != 'Mn'
+    )
+
+
+def _match_class_name(text_no_accent, cname_no_accent):
+    """
+    Verifica se o texto corresponde a um nome de classe considerando plural/singular.
+    
+    Args:
+        text_no_accent: Texto do prompt sem acentos
+        cname_no_accent: Nome da classe sem acentos
+    
+    Returns:
+        bool: True se houver correspondência
+    """
+    # Match direto
+    if cname_no_accent in text_no_accent or text_no_accent in cname_no_accent:
+        return True
+    
+    # Tenta plural/singular (português)
+    if cname_no_accent.endswith('s') and len(cname_no_accent) > 2:
+        singular = cname_no_accent[:-1]
+        
+        # Para palavras terminadas em "oes", também tenta "ao" (avião -> aviões)
+        if singular.endswith('oe'):
+            singular_ao = singular[:-2] + 'ao'
+            if singular_ao in text_no_accent or text_no_accent in singular_ao:
+                return True
+        
+        # Match com singular normal
+        if singular in text_no_accent or text_no_accent in singular:
+            return True
+    
+    return False
+
+
 def class_index_from_prompt(prompt_text, dataset_name, dataset_configs):
     """
     Retorna índice de classe a partir do texto do usuário.
@@ -327,55 +380,28 @@ def class_index_from_prompt(prompt_text, dataset_name, dataset_configs):
     Returns:
         int ou None: Índice da classe se encontrado, None caso contrário
     """
-    import re
-    
     classes = dataset_configs.get(dataset_name, {}).get("classes", [])
     if not classes or not prompt_text:
         return None
 
     text = prompt_text.lower()
+    text_no_accent = _remove_accents(text)
 
-    # Função auxiliar para remover acentos (português)
-    def remove_accents(s):
-        import unicodedata
-        return ''.join(
-            c for c in unicodedata.normalize('NFD', s)
-            if unicodedata.category(c) != 'Mn'
-        )
-
-    text_no_accent = remove_accents(text)
-
-    # 1) por nome de classe (CIFAR-10, Fashion-MNIST etc.)
+    # 1) Por nome de classe (CIFAR-10, Fashion-MNIST etc.)
     for i, cname in enumerate(classes):
         if not cname:
             continue
-        cname_lower = cname.lower()
-        cname_no_accent = remove_accents(cname_lower)
         
-        # Verifica se a classe está no texto OU se o texto está na classe
-        # Isso permite "gato" casar com "Gatos" e vice-versa
+        cname_lower = cname.lower()
+        
+        # Verifica match com acentos
         if cname_lower in text or text in cname_lower:
             return i
         
-        # Verifica sem acentos (para "aviao" casar com "Aviões")
-        if cname_no_accent in text_no_accent or text_no_accent in cname_no_accent:
+        # Verifica match sem acentos e com plural/singular
+        cname_no_accent = _remove_accents(cname_lower)
+        if _match_class_name(text_no_accent, cname_no_accent):
             return i
-        
-        # Também tenta match com plural/singular (português)
-        # "gato" -> "gatos", "aviao" -> "avioes", etc.
-        if cname_no_accent.endswith('s') and len(cname_no_accent) > 2:
-            # Remove 's' final
-            singular = cname_no_accent[:-1]
-            
-            # Para palavras terminadas em "oes", também tenta "ao" (avião -> aviões)
-            if singular.endswith('oe'):
-                singular_ao = singular[:-2] + 'ao'
-                if singular_ao in text_no_accent or text_no_accent in singular_ao:
-                    return i
-            
-            # Match com singular normal
-            if singular in text_no_accent or text_no_accent in singular:
-                return i
 
     # 2) MNIST: aceita dígito
     if dataset_name == "mnist":
@@ -407,7 +433,7 @@ def prompt_to_seed(prompt_text, dataset_name, selected_class, extra=0):
     
     base = f"{dataset_name}|{selected_class or ''}|{prompt_text}|{extra}"
     h = hashlib.sha256(base.encode("utf-8")).hexdigest()
-    return int(h[:8], 16)  # 32 bits já são suficientes
+    return int(h[:SEED_HASH_LENGTH], 16)  # 32 bits já são suficientes
 
 
 def is_conditional_checkpoint(checkpoint):
