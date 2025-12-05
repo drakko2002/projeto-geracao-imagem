@@ -52,6 +52,11 @@ def main():
     num_samples = input("Quantas imagens gerar? (padrão: 64): ").strip()
     if not num_samples:
         num_samples = "64"
+    
+    # Perguntar sobre upscale
+    upscale = input("Aplicar upscaling? (none/2x/4x/8x, padrão: none): ").strip().lower()
+    if not upscale or upscale not in ["2x", "4x", "8x"]:
+        upscale = "none"
 
     # Montar comando
     cmd = [
@@ -61,9 +66,13 @@ def main():
         checkpoint,
         "--num-samples",
         num_samples,
+        "--upscale",
+        upscale,
     ]
 
     print(f"\n🎨 Gerando {num_samples} imagens...")
+    if upscale != "none":
+        print(f"   Com upscaling {upscale}")
     print(f"Comando: {' '.join(cmd)}\n")
 
     # Executar

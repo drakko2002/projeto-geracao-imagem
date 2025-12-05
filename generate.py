@@ -50,6 +50,20 @@ def main():
         default=None,
         help="Dispositivo (cuda/cpu, padrão: auto-detectar)",
     )
+    parser.add_argument(
+        "--upscale",
+        type=str,
+        default="none",
+        choices=["none", "2x", "4x", "8x"],
+        help="Fator de upscaling pós-geração (padrão: none)",
+    )
+    parser.add_argument(
+        "--upscale-method",
+        type=str,
+        default="lanczos",
+        choices=["lanczos", "bicubic", "nearest"],
+        help="Método de upscaling (padrão: lanczos)",
+    )
 
     args = parser.parse_args()
 
@@ -114,9 +128,40 @@ def main():
         generator, args.num_samples, nz, device, args.output, nrow=args.nrow
     )
 
+    # Aplicar upscaling se solicitado
+    if args.upscale != "none":
+        from PIL import Image
+        
+        scale_factor = int(args.upscale.replace("x", ""))
+        print(f"\n📐 Aplicando upscaling {scale_factor}x com método {args.upscale_method}...")
+        
+        # Carregar imagem gerada
+        img = Image.open(args.output)
+        original_size = img.size
+        
+        # Aplicar upscaling
+        new_size = (original_size[0] * scale_factor, original_size[1] * scale_factor)
+        
+        if args.upscale_method == "lanczos":
+            upscaled = img.resize(new_size, Image.LANCZOS)
+        elif args.upscale_method == "bicubic":
+            upscaled = img.resize(new_size, Image.BICUBIC)
+        else:  # nearest
+            upscaled = img.resize(new_size, Image.NEAREST)
+        
+        # Salvar com sufixo
+        output_base = args.output.replace(".png", "")
+        upscaled_output = f"{output_base}_upscaled_{scale_factor}x.png"
+        upscaled.save(upscaled_output, quality=95)
+        
+        print(f"✓ Imagem upscaled salva em: {upscaled_output}")
+        print(f"  Resolução: {original_size[0]}x{original_size[1]} → {new_size[0]}x{new_size[1]}")
+
     print(f"\n✅ Imagens geradas e salvas em: {args.output}")
     print(f"   Total de imagens: {args.num_samples}")
     print(f"   Grid: {args.nrow} imagens por linha")
+    if args.upscale != "none":
+        print(f"   Upscaling: {args.upscale} usando {args.upscale_method}")
     print("\n✨ Concluído!\n")
 
 

@@ -30,7 +30,7 @@ DATASET_CONFIGS = {
             "Caminhões",
         ],
         "nc": 3,  # RGB
-        "default_img_size": 64,
+        "default_img_size": 128,  # Padrão 128px, suporta preset 256px
         "download": True,
     },
     "mnist": {
@@ -38,7 +38,7 @@ DATASET_CONFIGS = {
         "description": "Dígitos escritos à mão 28x28 em escala de cinza",
         "classes": ["0","1","2","3","4","5","6","7","8","9"],
         "nc": 1,  # Grayscale
-        "default_img_size": 64,
+        "default_img_size": 128,  # Padrão 128px, suporta preset 256px
         "download": True,
     },
     "fashion-mnist": {
@@ -57,7 +57,7 @@ DATASET_CONFIGS = {
             "Bota",
         ],
         "nc": 1,  # Grayscale
-        "default_img_size": 64,
+        "default_img_size": 128,  # Padrão 128px, suporta preset 256px
         "download": True,
     },
     "celeba": {
@@ -65,7 +65,7 @@ DATASET_CONFIGS = {
         "description": "Imagens de celebridades (requer download manual)",
         "classes": ["Faces de celebridades"],
         "nc": 3,  # RGB
-        "default_img_size": 64,
+        "default_img_size": 128,  # Padrão 128px, suporta preset 256px
         "download": False,  # Requer download manual
     },
     "custom": {
@@ -73,7 +73,7 @@ DATASET_CONFIGS = {
         "description": "Dataset customizado (pasta de imagens)",
         "classes": ["Imagens customizadas"],
         "nc": 3,  # RGB (pode ser ajustado)
-        "default_img_size": 64,
+        "default_img_size": 128,  # Padrão 128px, suporta preset 256px
         "download": False,
     },
 }
